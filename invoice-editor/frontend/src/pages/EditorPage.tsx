@@ -96,7 +96,7 @@ export function EditorPage() {
               </>
             )}
           />
-        </div>
+        </div>}
       </div>
     </div>
   )
