@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useLocation, useNavigate } from 'react-router-dom'
 import { useEditorState } from '../hooks/useEditorState'
 import { useExport } from '../hooks/useExport'
@@ -13,6 +13,7 @@ export function EditorPage() {
   const navigate = useNavigate()
   const { state, init, edit, reset, setExporting } = useEditorState()
   const { doExport, exportError } = useExport(state, setExporting)
+  const [showPreview, setShowPreview] = useState(true)
 
   useEffect(() => {
     if (!location.state) {
@@ -35,7 +36,16 @@ export function EditorPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
-      <Toolbar state={state} onReset={reset} onExport={doExport} exportError={exportError} />
+      <Toolbar
+        state={state}
+        onReset={reset}
+        onExport={doExport}
+        exportError={exportError}
+        showPreview={showPreview}
+        onTogglePreview={() => setShowPreview(v => !v)}
+        onChangeFile={() => navigate('/', { state: { docType: state.docType } })}
+        onGoHome={() => navigate('/')}
+      />
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
@@ -64,7 +74,7 @@ export function EditorPage() {
         </div>
 
         {/* Right panel: preview */}
-        <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
+        {showPreview && <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
           <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
             Vista previa en tiempo real
           </p>

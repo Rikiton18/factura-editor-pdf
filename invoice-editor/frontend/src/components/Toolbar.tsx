@@ -5,9 +5,13 @@ interface ToolbarProps {
   onReset: () => void
   onExport: (regenerateQr: boolean) => void
   exportError?: string | null
+  showPreview: boolean
+  onTogglePreview: () => void
+  onChangeFile: () => void
+  onGoHome: () => void
 }
 
-export function Toolbar({ state, onReset, onExport, exportError }: ToolbarProps) {
+export function Toolbar({ state, onReset, onExport, exportError, showPreview, onTogglePreview, onChangeFile, onGoHome }: ToolbarProps) {
   const editCount = state.edits.size
   const isFiscal = state.docType === 'fiscal'
 
@@ -21,6 +25,20 @@ export function Toolbar({ state, onReset, onExport, exportError }: ToolbarProps)
         borderBottom: exportError ? 'none' : '1px solid #e5e7eb',
         backgroundColor: '#f9fafb',
       }}>
+        <button
+          onClick={onGoHome}
+          style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #d1d5db', backgroundColor: 'white', cursor: 'pointer', fontSize: 13 }}
+        >
+          ← Inicio
+        </button>
+
+        <button
+          onClick={onChangeFile}
+          style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #d1d5db', backgroundColor: 'white', cursor: 'pointer', fontSize: 13 }}
+        >
+          Cambiar factura
+        </button>
+
         <span style={{ fontWeight: 600, flex: 1 }}>
           {isFiscal ? 'Factura Fiscal' : 'Factura Regular'}
           {editCount > 0 && (
@@ -29,6 +47,18 @@ export function Toolbar({ state, onReset, onExport, exportError }: ToolbarProps)
             </span>
           )}
         </span>
+
+        <button
+          onClick={onTogglePreview}
+          style={{
+            padding: '6px 12px', borderRadius: 6, fontSize: 13, cursor: 'pointer',
+            border: '1px solid #d1d5db',
+            backgroundColor: showPreview ? '#1d4ed8' : 'white',
+            color: showPreview ? 'white' : 'inherit',
+          }}
+        >
+          {showPreview ? 'Ocultar vista previa' : 'Mostrar vista previa'}
+        </button>
 
         <button
           onClick={onReset}
