@@ -24,8 +24,7 @@ app = FastAPI(title="Invoice PDF Editor", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"https://.*\.vercel\.app",
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["*"],
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],
 )
