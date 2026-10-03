@@ -6,6 +6,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ..config import settings
+from ..demo_extractor import get_demo_data
+from ..demo_store import save_demo_snapshot
 from ..pdf_exporter import apply_edits
 from ..qr_generator import replace_qr_in_doc
 from ..session_store import get_session, update_session_edits
@@ -42,7 +44,10 @@ async def export_pdf(session_id: str, req: ExportRequest):
         doc.close()
         pdf_bytes = buf.getvalue()
 
-    # Persist edits so the demo page can read them
-    update_session_edits(session_id, {e.block_id: e.new_text for e in req.edits})
+    # Persist edits in memory and to disk so the demo page survives restarts
+    edits_map = {e.block_id: e.new_text for e in req.edits}
+    update_session_edits(session_id, edits_map)
+    demo_payload = get_demo_data(session)
+    save_demo_snapshot(session_id, session.doc_type, demo_payload["blocks"], edits_map)
 
     return {"pdf_base64": base64.b64encode(pdf_bytes).decode()}

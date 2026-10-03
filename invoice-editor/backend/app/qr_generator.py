@@ -28,6 +28,7 @@ def replace_qr_in_doc(doc: fitz.Document, session_id: str, base_url: str) -> Non
     upper_right_y = page_rect.height * 0.4
 
     best_xref: int | None = None
+    best_rect: fitz.Rect | None = None
     best_area: float = 0.0
 
     for img_info in page.get_images(full=True):
@@ -38,6 +39,9 @@ def replace_qr_in_doc(doc: fitz.Document, session_id: str, base_url: str) -> Non
                 if area > best_area:
                     best_area = area
                     best_xref = xref
+                    best_rect = rect
 
-    if best_xref is not None:
-        doc.replace_image(best_xref, stream=qr_png_bytes)
+    if best_xref is not None and best_rect is not None:
+        # Cover original image with white, then draw new QR on top
+        page.draw_rect(best_rect, color=(1, 1, 1), fill=(1, 1, 1))
+        page.insert_image(best_rect, stream=qr_png_bytes)

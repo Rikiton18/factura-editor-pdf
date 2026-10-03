@@ -4,6 +4,7 @@ interface ToolbarProps {
   state: EditorState
   onReset: () => void
   onExport: (regenerateQr: boolean) => void
+  onPreviewPdf: () => void
   exportError?: string | null
   showPreview: boolean
   onTogglePreview: () => void
@@ -11,7 +12,7 @@ interface ToolbarProps {
   onGoHome: () => void
 }
 
-export function Toolbar({ state, onReset, onExport, exportError, showPreview, onTogglePreview, onChangeFile, onGoHome }: ToolbarProps) {
+export function Toolbar({ state, onReset, onExport, onPreviewPdf, exportError, showPreview, onTogglePreview, onChangeFile, onGoHome }: ToolbarProps) {
   const editCount = state.edits.size
   const isFiscal = state.docType === 'fiscal'
 
@@ -73,6 +74,18 @@ export function Toolbar({ state, onReset, onExport, exportError, showPreview, on
           }}
         >
           Resetear cambios
+        </button>
+
+        <button
+          onClick={onPreviewPdf}
+          disabled={state.isExporting}
+          style={{
+            padding: '6px 14px', borderRadius: 6, fontSize: 13, cursor: state.isExporting ? 'not-allowed' : 'pointer',
+            border: '1px solid #059669', backgroundColor: '#ecfdf5', color: '#065f46',
+            opacity: state.isExporting ? 0.5 : 1,
+          }}
+        >
+          {state.isExporting ? 'Procesando…' : '🔍 Ver PDF'}
         </button>
 
         {isFiscal ? (

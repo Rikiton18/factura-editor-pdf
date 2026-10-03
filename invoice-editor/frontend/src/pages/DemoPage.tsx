@@ -31,19 +31,8 @@ export function DemoPage() {
       .catch(() => setError('Sesión no encontrada o expirada.'))
   }, [sessionId])
 
-  if (error) return (
-    <>
-      <div className="sim-banner">⚠ SIMULACIÓN — Esta página es una demostración educativa del sistema DGI de Panamá</div>
-      <div style={{ padding: 24 }}>{error}</div>
-    </>
-  )
-
-  if (!data) return (
-    <>
-      <div className="sim-banner">⚠ SIMULACIÓN — Esta página es una demostración educativa del sistema DGI de Panamá</div>
-      <div style={{ padding: 24 }}>Cargando...</div>
-    </>
-  )
+  if (error) return <div style={{ padding: 24 }}>{error}</div>
+  if (!data) return <div style={{ padding: 24 }}>Cargando...</div>
 
   const blocks = data.blocks
 
@@ -54,10 +43,6 @@ export function DemoPage() {
 
   return (
     <>
-      <div className="sim-banner">
-        ⚠ SIMULACIÓN — Esta página es una demostración educativa del sistema DGI de Panamá
-      </div>
-
       <div className="dgi-header">
         <div>
           <p className="subtitle">REPÚBLICA DE PANAMÁ</p>
@@ -102,10 +87,6 @@ export function DemoPage() {
           </div>
 
           <div className="col-sm-9">
-            <div className="alert-dgi">
-              Esta es una simulación con fines didácticos. El documento mostrado no tiene validez fiscal.
-            </div>
-
             <div className="panel panel-default" style={{ marginBottom: 12 }}>
               <div className="section-title">COMPROBANTE AUXILIAR DE FACTURA ELECTRÓNICA</div>
               <div className="panel-body" style={{ padding: '12px 16px' }}>

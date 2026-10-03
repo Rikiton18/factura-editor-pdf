@@ -43,34 +43,22 @@ def apply_edits(
         page.apply_redactions()
 
         # Phase 3: insert new text at original baseline
+        helv = fitz.Font("helv")
         for block, new_text in page_edits:
-            # y1 - 1 approximates the text baseline (avoids clipping descenders)
+            fontsize = block.size
+            text_width = helv.text_length(new_text, fontsize=fontsize)
+            orig_width = block.x1 - block.x0
+            if text_width > orig_width:
+                # Clear extra space so longer text isn't hidden behind existing content
+                clear_rect = fitz.Rect(block.x0, block.y0, block.x0 + text_width + 2, block.y1)
+                page.draw_rect(clear_rect, color=(1, 1, 1), fill=(1, 1, 1))
             page.insert_text(
                 (block.x0, block.y1 - 1.0),
                 new_text,
                 fontname="helv",
-                fontsize=block.size,
+                fontsize=fontsize,
                 color=block.color,
             )
-
-    if doc_type == "fiscal":
-        watermark_text = "SIMULACIÓN — SIN VALIDEZ FISCAL"
-        for page in doc:
-            w, h = page.rect.width, page.rect.height
-            page.insert_textbox(
-                fitz.Rect(0, 0, w, h),
-                watermark_text,
-                fontname="helv",
-                fontsize=36,
-                color=(0.85, 0.1, 0.1),
-                rotate=45,
-                align=fitz.TEXT_ALIGN_CENTER,
-                overlay=True,
-            )
-        doc.set_metadata({
-            "subject": "Simulación — sin validez fiscal",
-            "producer": "Editor de Facturas — Simulación didáctica",
-        })
 
     buf = io.BytesIO()
     doc.save(buf, garbage=4, deflate=True)

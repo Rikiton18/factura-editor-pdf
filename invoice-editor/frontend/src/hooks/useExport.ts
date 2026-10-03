@@ -40,10 +40,34 @@ export function useExport(state: EditorState, setExporting: (v: boolean) => void
     }
   }
 
+  const previewPdf = async (regenerateQr = false) => {
+    setExporting(true)
+    setExportError(null)
+    try {
+      const edits = Array.from(state.edits.entries()).map(([block_id, new_text]) => ({
+        block_id,
+        new_text,
+      }))
+      const { data } = await exportPDF(state.sessionId, { edits, regenerate_qr: regenerateQr })
+      const blob = base64ToBlob(data.pdf_base64)
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank')
+      setTimeout(() => URL.revokeObjectURL(url), 30000)
+    } catch (err: unknown) {
+      const status = (err as { response?: { response?: { status?: number } } })?.response?.response?.status
+      if (status === 404) {
+        setExportError('Sesión expirada — vuelva a cargar el PDF')
+      } else {
+        setExportError('Error al previsualizar el PDF.')
+      }
+    } finally {
+      setExporting(false)
+    }
+  }
+
   const clearExportError = () => setExportError(null)
 
-  // Keep doExport as an alias for backwards compatibility
   const doExport = exportAndDownload
 
-  return { exportAndDownload, doExport, exportError, clearExportError }
+  return { exportAndDownload, doExport, previewPdf, exportError, clearExportError }
 }
