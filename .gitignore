@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.env
+invoice-editor/backend/.venv/
+invoice-editor/frontend/node_modules/
+invoice-editor/frontend/dist/
+.superpowers/
+docs/superpowers/
