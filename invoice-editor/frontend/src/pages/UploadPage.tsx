@@ -37,8 +37,6 @@ export function UploadPage() {
     }
   }
 
-  const handleDemo = () => navigate('/demo/demo')
-
   return (
     <div style={{ minHeight: '100svh', background: 'var(--bg)', fontFamily: 'var(--font)' }}>
 
@@ -199,45 +197,6 @@ export function UploadPage() {
               {error}
             </div>
           )}
-        </div>
-
-        {/* Demo divider */}
-        <div style={{ marginTop: 22 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-            <span style={{ fontSize: 12, color: 'var(--fg-subtle)' }}>o</span>
-            <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-          </div>
-          <button
-            onClick={handleDemo}
-            disabled={loading}
-            style={{
-              marginTop: 14,
-              width: '100%',
-              padding: '11px 16px',
-              borderRadius: 'var(--r)',
-              border: '1px solid var(--border)',
-              background: 'var(--bg)',
-              color: 'var(--fg-muted)',
-              fontSize: 13,
-              fontWeight: 500,
-              cursor: 'pointer',
-              transition: 'all var(--t)',
-              boxShadow: 'var(--shadow-sm)',
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = 'var(--bg-subtle)'
-              e.currentTarget.style.borderColor = 'var(--accent)'
-              e.currentTarget.style.color = 'var(--accent)'
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = 'var(--bg)'
-              e.currentTarget.style.borderColor = 'var(--border)'
-              e.currentTarget.style.color = 'var(--fg-muted)'
-            }}
-          >
-            ✨ Cargar demo con datos de prueba
-          </button>
         </div>
 
         <p style={{ marginTop: 24, fontSize: 11, color: 'var(--fg-subtle)', textAlign: 'center' }}>
