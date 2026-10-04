@@ -45,7 +45,7 @@ export function UploadPage() {
       {/* Gradient hero */}
       <div style={{
         background: 'var(--grad)',
-        padding: '52px 24px 96px',
+        padding: '52px 24px 56px',
         textAlign: 'center',
         position: 'relative',
         overflow: 'hidden',
@@ -139,7 +139,7 @@ export function UploadPage() {
       </div>
 
       {/* Cards overlapping the gradient */}
-      <div style={{ maxWidth: 600, margin: '-56px auto 0', padding: '0 24px 48px' }}>
+      <div style={{ maxWidth: 600, margin: '-20px auto 0', padding: '0 24px 48px' }}>
 
         {/* Dropzone grid */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
