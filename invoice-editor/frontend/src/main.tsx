@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { pdfjs } from 'react-pdf'
+import './index.css'
 import App from './App'
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
