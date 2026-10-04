@@ -123,7 +123,7 @@ export function UploadPage() {
           marginBottom: 16,
           textShadow: '0 2px 12px rgba(0,0,0,0.15)',
         }}>
-          Edita tus facturas<br />con precisión
+          Editor de Facturas PDF
         </h1>
 
         <p style={{
