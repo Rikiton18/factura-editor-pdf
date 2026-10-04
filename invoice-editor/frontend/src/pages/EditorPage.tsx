@@ -48,7 +48,7 @@ export function EditorPage() {
         alignItems: 'center',
         justifyContent: 'center',
         height: '100svh',
-        color: 'var(--fg-muted)',
+        color: 'var(--accent)',
         fontSize: 14,
         gap: 8,
       }}>
@@ -97,7 +97,7 @@ export function EditorPage() {
             top: 0,
             zIndex: 10,
           }}>
-            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--fg-subtle)' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--accent)' }}>
               Editor
             </span>
             <span style={{ fontSize: 11, color: 'var(--fg-subtle)' }}>
@@ -143,7 +143,7 @@ export function EditorPage() {
               top: 0,
               zIndex: 10,
             }}>
-              <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--fg-subtle)' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--accent)' }}>
                 Vista previa
               </span>
               <span style={{ fontSize: 11, color: 'var(--fg-subtle)' }}>

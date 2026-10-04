@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { EditorState } from '../types'
 
 interface ToolbarProps {
@@ -13,10 +14,14 @@ interface ToolbarProps {
   onHelp: () => void
 }
 
-const btn = (variant: 'ghost' | 'outline' | 'primary' | 'success'): React.CSSProperties => {
-  const base: React.CSSProperties = {
+export function Toolbar({ state, onReset, onExport, onPreviewPdf, exportError, showPreview, onTogglePreview, onChangeFile, onGoHome, onHelp }: ToolbarProps) {
+  const editCount = state.edits.size
+  const isFiscal = state.docType === 'fiscal'
+  const [hoveredBtn, setHoveredBtn] = useState<string | null>(null)
+
+  const ghostStyle = (id: string): React.CSSProperties => ({
     height: 30,
-    padding: '0 12px',
+    padding: '0 10px',
     borderRadius: 'var(--r)',
     fontSize: 12,
     fontWeight: 500,
@@ -25,19 +30,71 @@ const btn = (variant: 'ghost' | 'outline' | 'primary' | 'success'): React.CSSPro
     alignItems: 'center',
     gap: 5,
     whiteSpace: 'nowrap',
-    transition: 'background var(--t), color var(--t), border-color var(--t)',
+    transition: 'all var(--t)',
     flexShrink: 0,
-  }
-  if (variant === 'ghost') return { ...base, background: 'transparent', border: '1px solid transparent', color: 'var(--fg-muted)' }
-  if (variant === 'outline') return { ...base, background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--fg)' }
-  if (variant === 'primary') return { ...base, background: 'var(--accent)', border: '1px solid var(--accent)', color: 'var(--accent-fg)' }
-  if (variant === 'success') return { ...base, background: 'var(--success-bg)', border: '1px solid var(--success-border)', color: 'var(--success)' }
-  return base
-}
+    background: hoveredBtn === id ? 'var(--bg-muted)' : 'transparent',
+    border: '1px solid transparent',
+    color: hoveredBtn === id ? 'var(--accent)' : 'var(--fg-muted)',
+  })
 
-export function Toolbar({ state, onReset, onExport, onPreviewPdf, exportError, showPreview, onTogglePreview, onChangeFile, onGoHome, onHelp }: ToolbarProps) {
-  const editCount = state.edits.size
-  const isFiscal = state.docType === 'fiscal'
+  const outlineStyle = (id: string): React.CSSProperties => ({
+    height: 30,
+    padding: '0 10px',
+    borderRadius: 'var(--r)',
+    fontSize: 12,
+    fontWeight: 500,
+    cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 5,
+    whiteSpace: 'nowrap',
+    transition: 'all var(--t)',
+    flexShrink: 0,
+    background: hoveredBtn === id ? 'var(--bg-muted)' : 'var(--bg)',
+    border: `1px solid ${hoveredBtn === id ? 'var(--border-strong)' : 'var(--border)'}`,
+    color: hoveredBtn === id ? 'var(--accent)' : 'var(--fg)',
+  })
+
+  const successStyle = (id: string): React.CSSProperties => ({
+    height: 30,
+    padding: '0 10px',
+    borderRadius: 'var(--r)',
+    fontSize: 12,
+    fontWeight: 500,
+    cursor: state.isExporting ? 'default' : 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 5,
+    whiteSpace: 'nowrap',
+    transition: 'all var(--t)',
+    flexShrink: 0,
+    background: 'var(--success-bg)',
+    border: '1px solid var(--success-border)',
+    color: 'var(--success)',
+    opacity: hoveredBtn === id && !state.isExporting ? 0.85 : 1,
+  })
+
+  const primaryStyle = (id: string): React.CSSProperties => ({
+    height: 30,
+    padding: '0 12px',
+    borderRadius: 'var(--r)',
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: state.isExporting ? 'default' : 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 5,
+    whiteSpace: 'nowrap',
+    transition: 'all var(--t)',
+    flexShrink: 0,
+    background: hoveredBtn === id && !state.isExporting ? 'var(--grad-hover)' : 'var(--grad)',
+    border: 'none',
+    color: 'white',
+    boxShadow: hoveredBtn === id && !state.isExporting ? 'var(--shadow-md)' : 'var(--shadow-sm)',
+  })
+
+  const hover = (id: string) => setHoveredBtn(id)
+  const unhover = () => setHoveredBtn(null)
 
   return (
     <div>
@@ -46,31 +103,29 @@ export function Toolbar({ state, onReset, onExport, onPreviewPdf, exportError, s
         alignItems: 'center',
         gap: 6,
         padding: '0 12px',
-        height: 46,
+        height: 48,
         borderBottom: '1px solid var(--border)',
         background: 'var(--bg)',
         overflowX: 'auto',
       }}>
         {/* Left group */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
           <button
             onClick={onGoHome}
-            style={btn('ghost')}
+            style={ghostStyle('home')}
             title="Ir al inicio"
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-muted)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            onMouseEnter={() => hover('home')}
+            onMouseLeave={unhover}
           >
             ← Inicio
           </button>
-
-          <div style={{ width: 1, height: 16, background: 'var(--border)' }} />
-
+          <div style={{ width: 1, height: 16, background: 'var(--border)', flexShrink: 0 }} />
           <button
             onClick={onChangeFile}
-            style={btn('ghost')}
+            style={ghostStyle('change')}
             title="Cambiar factura"
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-muted)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            onMouseEnter={() => hover('change')}
+            onMouseLeave={unhover}
           >
             Cambiar factura
           </button>
@@ -83,14 +138,14 @@ export function Toolbar({ state, onReset, onExport, onPreviewPdf, exportError, s
           </span>
           {editCount > 0 && (
             <span style={{
-              padding: '1px 8px',
+              padding: '2px 8px',
               borderRadius: 99,
-              background: 'var(--success-bg)',
-              border: '1px solid var(--success-border)',
-              color: 'var(--success)',
+              background: 'var(--grad)',
+              color: 'white',
               fontSize: 11,
-              fontWeight: 500,
+              fontWeight: 600,
               whiteSpace: 'nowrap',
+              boxShadow: 'var(--shadow-sm)',
             }}>
               {editCount} campo{editCount !== 1 ? 's' : ''} editado{editCount !== 1 ? 's' : ''}
             </span>
@@ -101,9 +156,9 @@ export function Toolbar({ state, onReset, onExport, onPreviewPdf, exportError, s
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <button
             onClick={onTogglePreview}
-            style={btn('outline')}
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-muted)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg)')}
+            style={outlineStyle('preview')}
+            onMouseEnter={() => hover('preview')}
+            onMouseLeave={unhover}
           >
             {showPreview ? '⊟ Ocultar' : '⊞ Previa'}
           </button>
@@ -111,10 +166,14 @@ export function Toolbar({ state, onReset, onExport, onPreviewPdf, exportError, s
           <button
             onClick={onReset}
             disabled={editCount === 0}
-            style={btn('outline')}
+            style={{
+              ...outlineStyle('reset'),
+              opacity: editCount === 0 ? 0.4 : 1,
+              cursor: editCount === 0 ? 'not-allowed' : 'pointer',
+            }}
             title="Deshacer todos los cambios"
-            onMouseEnter={e => !state.isExporting && editCount > 0 && (e.currentTarget.style.background = 'var(--bg-muted)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg)')}
+            onMouseEnter={() => editCount > 0 && hover('reset')}
+            onMouseLeave={unhover}
           >
             ↩ Resetear
           </button>
@@ -122,34 +181,34 @@ export function Toolbar({ state, onReset, onExport, onPreviewPdf, exportError, s
           <button
             onClick={onPreviewPdf}
             disabled={state.isExporting}
-            style={btn('success')}
+            style={successStyle('viewpdf')}
             title="Ver PDF en nueva pestaña"
-            onMouseEnter={e => !state.isExporting && (e.currentTarget.style.opacity = '0.85')}
-            onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+            onMouseEnter={() => !state.isExporting && hover('viewpdf')}
+            onMouseLeave={unhover}
           >
             {state.isExporting ? '…' : '🔍 Ver PDF'}
           </button>
 
-          <div style={{ width: 1, height: 16, background: 'var(--border)' }} />
+          <div style={{ width: 1, height: 16, background: 'var(--border)', flexShrink: 0 }} />
 
           {isFiscal ? (
             <>
               <button
                 onClick={() => onExport(false)}
                 disabled={state.isExporting}
-                style={btn('outline')}
-                onMouseEnter={e => !state.isExporting && (e.currentTarget.style.background = 'var(--bg-muted)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg)')}
+                style={outlineStyle('pdf')}
+                onMouseEnter={() => !state.isExporting && hover('pdf')}
+                onMouseLeave={unhover}
               >
                 {state.isExporting ? 'Exportando…' : '⬇ PDF'}
               </button>
               <button
                 onClick={() => onExport(true)}
                 disabled={state.isExporting}
-                style={btn('primary')}
+                style={primaryStyle('pdfqr')}
                 title="Exportar y regenerar código QR"
-                onMouseEnter={e => !state.isExporting && (e.currentTarget.style.background = 'var(--accent-hover)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'var(--accent)')}
+                onMouseEnter={() => !state.isExporting && hover('pdfqr')}
+                onMouseLeave={unhover}
               >
                 {state.isExporting ? 'Exportando…' : '⬇ PDF + QR'}
               </button>
@@ -158,29 +217,29 @@ export function Toolbar({ state, onReset, onExport, onPreviewPdf, exportError, s
             <button
               onClick={() => onExport(false)}
               disabled={state.isExporting}
-              style={btn('primary')}
-              onMouseEnter={e => !state.isExporting && (e.currentTarget.style.background = 'var(--accent-hover)')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'var(--accent)')}
+              style={primaryStyle('export')}
+              onMouseEnter={() => !state.isExporting && hover('export')}
+              onMouseLeave={unhover}
             >
               {state.isExporting ? 'Exportando…' : '⬇ Exportar PDF'}
             </button>
           )}
 
-          <div style={{ width: 1, height: 16, background: 'var(--border)' }} />
+          <div style={{ width: 1, height: 16, background: 'var(--border)', flexShrink: 0 }} />
 
           <button
             onClick={onHelp}
             style={{
-              ...btn('ghost'),
+              ...ghostStyle('help'),
               width: 30,
               padding: 0,
               justifyContent: 'center',
-              fontWeight: 600,
-              fontSize: 13,
+              fontWeight: 700,
+              fontSize: 14,
             }}
             title="Ayuda (tecla ?)"
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-muted)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            onMouseEnter={() => hover('help')}
+            onMouseLeave={unhover}
           >
             ?
           </button>

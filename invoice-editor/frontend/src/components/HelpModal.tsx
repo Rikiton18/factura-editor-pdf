@@ -36,21 +36,22 @@ const S = {
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: '20px 24px',
-    borderBottom: '1px solid var(--border)',
+    background: 'var(--grad)',
     flexShrink: 0,
   },
   title: {
     fontSize: 16,
     fontWeight: 600,
     letterSpacing: '-0.01em',
+    color: 'white',
   },
   closeBtn: {
     width: 28,
     height: 28,
     borderRadius: 'var(--r-sm)',
-    border: '1px solid var(--border)',
-    background: 'transparent',
-    color: 'var(--fg-muted)',
+    border: '1px solid rgba(255,255,255,0.3)',
+    background: 'rgba(255,255,255,0.15)',
+    color: 'white',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
@@ -71,7 +72,7 @@ const S = {
     fontWeight: 600,
     letterSpacing: '0.06em',
     textTransform: 'uppercase' as const,
-    color: 'var(--fg-subtle)',
+    color: 'var(--accent)',
     marginBottom: 12,
   },
   grid: {
@@ -156,8 +157,8 @@ export function HelpModal({ onClose, context = 'editor', docType }: HelpModalPro
           <button
             style={S.closeBtn}
             onClick={onClose}
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-muted)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.25)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.15)')}
             aria-label="Cerrar ayuda"
           >
             ✕
