@@ -12,7 +12,7 @@ export function EditorPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const { state, init, edit, reset, setExporting } = useEditorState()
-  const { doExport, previewPdf, exportError } = useExport(state, setExporting)
+  const { exportAndDownload, previewPdf, exportError } = useExport(state, setExporting)
   const [showPreview, setShowPreview] = useState(true)
 
   useEffect(() => {
@@ -39,7 +39,7 @@ export function EditorPage() {
       <Toolbar
         state={state}
         onReset={reset}
-        onExport={doExport}
+        onExport={exportAndDownload}
         onPreviewPdf={() => previewPdf(false)}
         exportError={exportError}
         showPreview={showPreview}

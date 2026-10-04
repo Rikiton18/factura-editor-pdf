@@ -17,7 +17,10 @@ async def upload_pdf(
     if doc_type not in ("regular", "fiscal"):
         raise HTTPException(status_code=400, detail="doc_type must be 'regular' or 'fiscal'")
 
-    pdf_bytes = await file.read()
+    MAX_PDF_BYTES = 20 * 1024 * 1024  # 20 MB
+    pdf_bytes = await file.read(MAX_PDF_BYTES + 1)
+    if len(pdf_bytes) > MAX_PDF_BYTES:
+        raise HTTPException(status_code=413, detail="PDF demasiado grande (máximo 20 MB).")
 
     try:
         _doc = fitz.open(stream=pdf_bytes, filetype="pdf")

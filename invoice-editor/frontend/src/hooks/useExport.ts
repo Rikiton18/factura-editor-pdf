@@ -54,7 +54,7 @@ export function useExport(state: EditorState, setExporting: (v: boolean) => void
       window.open(url, '_blank')
       setTimeout(() => URL.revokeObjectURL(url), 30000)
     } catch (err: unknown) {
-      const status = (err as { response?: { response?: { status?: number } } })?.response?.response?.status
+      const status = (err as { response?: { status?: number } })?.response?.status
       if (status === 404) {
         setExportError('Sesión expirada — vuelva a cargar el PDF')
       } else {
@@ -67,7 +67,5 @@ export function useExport(state: EditorState, setExporting: (v: boolean) => void
 
   const clearExportError = () => setExportError(null)
 
-  const doExport = exportAndDownload
-
-  return { exportAndDownload, doExport, previewPdf, exportError, clearExportError }
+  return { exportAndDownload, previewPdf, exportError, clearExportError }
 }
