@@ -2,11 +2,13 @@ import { useRef, useState } from 'react'
 
 interface FileDropzoneProps {
   label: string
+  description: string
+  icon: string
   onFile: (file: File) => void
   disabled?: boolean
 }
 
-export function FileDropzone({ label, onFile, disabled = false }: FileDropzoneProps) {
+export function FileDropzone({ label, description, icon, onFile, disabled = false }: FileDropzoneProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
 
@@ -16,28 +18,38 @@ export function FileDropzone({ label, onFile, disabled = false }: FileDropzonePr
 
   return (
     <div
+      role="button"
+      tabIndex={disabled ? -1 : 0}
+      aria-label={`Subir ${label}`}
       onClick={() => !disabled && inputRef.current?.click()}
-      onDragOver={e => { e.preventDefault(); setDragging(true) }}
+      onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && !disabled) inputRef.current?.click() }}
+      onDragOver={e => { e.preventDefault(); if (!disabled) setDragging(true) }}
       onDragLeave={() => setDragging(false)}
       onDrop={e => {
         e.preventDefault()
         setDragging(false)
+        if (disabled) return
         const file = e.dataTransfer.files[0]
         if (file) handleFile(file)
       }}
       style={{
-        border: `2px dashed ${dragging ? '#2563eb' : '#9ca3af'}`,
-        borderRadius: 8,
-        padding: '32px 24px',
+        border: `1.5px dashed ${dragging ? 'var(--accent)' : 'var(--border-strong)'}`,
+        borderRadius: 'var(--r-lg)',
+        padding: '28px 24px',
         textAlign: 'center',
         cursor: disabled ? 'not-allowed' : 'pointer',
-        backgroundColor: dragging ? '#eff6ff' : '#f9fafb',
-        opacity: disabled ? 0.6 : 1,
-        marginBottom: 16,
+        backgroundColor: dragging ? 'var(--bg-muted)' : 'var(--bg-subtle)',
+        opacity: disabled ? 0.5 : 1,
+        transition: 'border-color var(--t), background-color var(--t)',
+        outline: 'none',
       }}
+      onFocus={e => !disabled && (e.currentTarget.style.boxShadow = '0 0 0 2px var(--accent)')}
+      onBlur={e => (e.currentTarget.style.boxShadow = 'none')}
     >
-      <p style={{ margin: 0, fontWeight: 600 }}>{label}</p>
-      <p style={{ margin: '8px 0 0', color: '#6b7280', fontSize: 14 }}>
+      <div style={{ fontSize: 28, marginBottom: 10, lineHeight: 1 }}>{icon}</div>
+      <p style={{ fontWeight: 600, fontSize: 14, color: 'var(--fg)', marginBottom: 4 }}>{label}</p>
+      <p style={{ fontSize: 12, color: 'var(--fg-muted)' }}>{description}</p>
+      <p style={{ fontSize: 11, color: 'var(--fg-subtle)', marginTop: 8 }}>
         Arrastra un PDF aquí o haz clic para seleccionar
       </p>
       <input
