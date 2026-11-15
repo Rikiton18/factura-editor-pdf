@@ -30,8 +30,16 @@ export function UploadPage() {
           scanned: data.scanned ?? false,
         },
       })
-    } catch {
-      setError('Error al procesar el PDF. Verifica que el archivo sea válido y no supere los 20 MB.')
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { status: number; data?: { detail?: string } }; message?: string }
+      if (axiosErr.response) {
+        const detail = axiosErr.response.data?.detail
+        setError(`Error ${axiosErr.response.status}: ${detail ?? 'Error del servidor. Intenta de nuevo.'}`)
+      } else if (axiosErr.message?.includes('Network Error') || axiosErr.message?.includes('ERR_') || axiosErr.message?.includes('ECONNREFUSED')) {
+        setError('No se puede conectar al servidor. El backend puede estar iniciándose — espera 30 segundos y vuelve a intentar.')
+      } else {
+        setError(`Error al procesar el PDF: ${axiosErr.message ?? 'Error desconocido'}`)
+      }
     } finally {
       setLoading(false)
     }
