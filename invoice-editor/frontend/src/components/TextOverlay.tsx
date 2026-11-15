@@ -54,13 +54,13 @@ export function EditableOverlay({ block, editedText, onEdit, scale }: EditableOv
         border: isEdited
           ? '1px dashed #16a34a'
           : hovered
-          ? '1px solid rgba(37,99,235,0.5)'
-          : '1px solid transparent',
+          ? '1px solid rgba(37,99,235,0.6)'
+          : '1px dashed rgba(37,99,235,0.25)',
         backgroundColor: isEdited
           ? 'rgba(255,255,255,0.9)'
           : hovered
           ? 'rgba(37,99,235,0.08)'
-          : 'transparent',
+          : 'rgba(37,99,235,0.03)',
         color: isEdited ? 'inherit' : 'transparent',
         cursor: 'text',
         userSelect: 'none',
