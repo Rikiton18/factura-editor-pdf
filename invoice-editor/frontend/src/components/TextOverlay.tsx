@@ -10,6 +10,7 @@ interface EditableOverlayProps {
 
 export function EditableOverlay({ block, editedText, onEdit, scale }: EditableOverlayProps) {
   const [active, setActive] = useState(false)
+  const [hovered, setHovered] = useState(false)
   const isEdited = editedText !== undefined
   const displayed = editedText ?? block.text
 
@@ -50,13 +51,24 @@ export function EditableOverlay({ block, editedText, onEdit, scale }: EditableOv
     <div
       style={{
         ...base,
-        border: isEdited ? '1px dashed #16a34a' : '1px solid transparent',
-        backgroundColor: isEdited ? 'rgba(255,255,255,0.9)' : 'transparent',
+        border: isEdited
+          ? '1px dashed #16a34a'
+          : hovered
+          ? '1px solid rgba(37,99,235,0.5)'
+          : '1px solid transparent',
+        backgroundColor: isEdited
+          ? 'rgba(255,255,255,0.9)'
+          : hovered
+          ? 'rgba(37,99,235,0.08)'
+          : 'transparent',
         color: isEdited ? 'inherit' : 'transparent',
         cursor: 'text',
         userSelect: 'none',
+        transition: 'border-color 0.15s, background-color 0.15s',
       }}
       onClick={() => setActive(true)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
       {displayed}
     </div>
