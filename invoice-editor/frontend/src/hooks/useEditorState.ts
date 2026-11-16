@@ -4,7 +4,7 @@ import type { EditorState, TextBlock } from '../types'
 type InitPayload = {
   sessionId: string
   docType: 'regular' | 'fiscal'
-  pdfBase64: string
+  pdfUrl: string
   blocks: TextBlock[]
   pageCount: number
 }
@@ -18,7 +18,7 @@ type Action =
 const initial: EditorState = {
   sessionId: '',
   docType: 'regular',
-  pdfBase64: '',
+  pdfUrl: '',
   blocks: [],
   edits: new Map(),
   isExporting: false,

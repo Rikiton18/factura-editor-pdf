@@ -16,7 +16,7 @@ export interface TextBlock {
 export interface EditorState {
   sessionId: string
   docType: 'regular' | 'fiscal'
-  pdfBase64: string
+  pdfUrl: string
   blocks: TextBlock[]
   edits: Map<string, string>
   isExporting: boolean

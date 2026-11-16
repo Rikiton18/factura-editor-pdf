@@ -5,7 +5,6 @@ const api = axios.create({ baseURL: import.meta.env.VITE_API_URL ?? '/api' })
 
 export interface UploadResponse {
   session_id: string
-  pdf_base64: string
   blocks: TextBlock[]
   page_count: number
   scanned: boolean

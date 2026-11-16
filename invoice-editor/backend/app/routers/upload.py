@@ -1,4 +1,3 @@
-import base64
 from dataclasses import asdict
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 import fitz
@@ -51,7 +50,6 @@ async def upload_pdf(
 
     return {
         "session_id": session_id,
-        "pdf_base64": base64.b64encode(pdf_bytes).decode(),
         "blocks": [asdict(b) for b in blocks],
         "page_count": page_count,
         "scanned": scanned,  # frontend can show "Modo OCR" badge

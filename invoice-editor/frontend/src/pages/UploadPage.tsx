@@ -23,7 +23,7 @@ export function UploadPage() {
       }
       navigate(`/editor/${data.session_id}`, {
         state: {
-          pdfBase64: data.pdf_base64,
+          pdfUrl: URL.createObjectURL(file),
           blocks: data.blocks,
           pageCount: data.page_count,
           docType,

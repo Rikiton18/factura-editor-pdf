@@ -25,7 +25,7 @@ export function EditorPage() {
     init({
       sessionId: sessionId!,
       docType: location.state.docType,
-      pdfBase64: location.state.pdfBase64,
+      pdfUrl: location.state.pdfUrl,
       blocks: location.state.blocks,
       pageCount: location.state.pageCount,
     })
@@ -41,7 +41,7 @@ export function EditorPage() {
     return () => document.removeEventListener('keydown', handler)
   }, [])
 
-  if (!state.pdfBase64) {
+  if (!state.pdfUrl) {
     return (
       <div style={{
         display: 'flex',
@@ -106,7 +106,7 @@ export function EditorPage() {
           </div>
           <div style={{ padding: 16 }}>
             <PDFViewer
-              pdfBase64={state.pdfBase64}
+              pdfUrl={state.pdfUrl}
               pageCount={state.pageCount}
               renderOverlays={(pageIndex, scale) => (
                 <>
@@ -152,7 +152,7 @@ export function EditorPage() {
             </div>
             <div style={{ padding: 16 }}>
               <PDFViewer
-                pdfBase64={state.pdfBase64}
+                pdfUrl={state.pdfUrl}
                 pageCount={state.pageCount}
                 renderOverlays={(pageIndex, scale) => (
                   <>

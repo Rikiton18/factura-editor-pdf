@@ -4,14 +4,14 @@ import 'react-pdf/dist/Page/TextLayer.css'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 
 interface PDFViewerProps {
-  pdfBase64: string
+  pdfUrl: string
   pageCount: number
   // Render overlays for each page. Receives page index (0-based) and the
   // computed scale factor (rendered_width / pdf_page_width_in_points).
   renderOverlays?: (pageIndex: number, scale: number) => React.ReactNode
 }
 
-export function PDFViewer({ pdfBase64, pageCount, renderOverlays }: PDFViewerProps) {
+export function PDFViewer({ pdfUrl, pageCount, renderOverlays }: PDFViewerProps) {
   const [pageWidths, setPageWidths] = useState<number[]>([])
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(600)
@@ -25,7 +25,7 @@ export function PDFViewer({ pdfBase64, pageCount, renderOverlays }: PDFViewerPro
     return () => observer.disconnect()
   }, [])
 
-  const file = `data:application/pdf;base64,${pdfBase64}`
+  const file = pdfUrl
 
   return (
     <div ref={containerRef} style={{ width: '100%' }}>
