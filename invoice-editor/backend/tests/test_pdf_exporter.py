@@ -25,7 +25,7 @@ def test_apply_edits_preserves_unedited_text(minimal_pdf_bytes):
 
 def test_generate_qr_bytes_returns_png():
     qr = generate_qr_bytes("http://localhost:5173/demo/abc123")
-    assert qr[:8] == b'\\x89PNG\\r\\n\\x1a\\n'
+    assert qr[:8] == b"\x89PNG\r\n\x1a\n"
 
 
 def test_apply_edits_returns_valid_pdf(minimal_pdf_bytes):
