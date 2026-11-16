@@ -37,10 +37,10 @@ def test_wide_gap_on_same_line_splits_columns():
         ("Fecha:", 1800, 50, 120, 1), ("2026-10-23", 1932, 50, 220, 1),
     ])
 
-    left, right = blocks_from_tesseract_data(data, page_num=0)
+    left, label, value = blocks_from_tesseract_data(data, page_num=0)
 
-    assert (left.text, right.text) == ("SEA LAS", "Fecha: 2026-10-23")
-    assert left.x1 < right.x0  # boxes no longer overlap horizontally
+    assert (left.text, label.text, value.text) == ("SEA LAS", "Fecha:", "2026-10-23")
+    assert left.x1 < label.x0  # boxes no longer overlap horizontally
 
 
 def test_table_row_cells_become_separate_blocks():
@@ -79,3 +79,24 @@ def test_separate_lines_never_merge():
     data = _data([("A", 100, 50, 30, 1), ("B", 100, 100, 30, 2)])
 
     assert _texts(blocks_from_tesseract_data(data, page_num=0)) == ["A", "B"]
+
+
+def test_label_ending_in_colon_is_split_from_its_value():
+    data = _data([("Detalle:", 100, 50, 130, 1), ("AMD01N0140277", 242, 50, 300, 1)])
+
+    assert _texts(blocks_from_tesseract_data(data, page_num=0)) == ["Detalle:", "AMD01N0140277"]
+
+
+def test_multiword_label_is_cut_only_after_the_colon():
+    data = _data([
+        ("Términos", 100, 50, 140, 1), ("de", 252, 50, 40, 1), ("Venta:", 304, 50, 120, 1),
+        ("CREDIT", 436, 50, 150, 1),
+    ])
+
+    assert _texts(blocks_from_tesseract_data(data, page_num=0)) == ["Términos de Venta:", "CREDIT"]
+
+
+def test_colon_inside_a_value_does_not_split():
+    data = _data([("Hora:", 100, 50, 100, 1), ("10:30", 212, 50, 100, 1), ("AM", 324, 50, 60, 1)])
+
+    assert _texts(blocks_from_tesseract_data(data, page_num=0)) == ["Hora:", "10:30 AM"]

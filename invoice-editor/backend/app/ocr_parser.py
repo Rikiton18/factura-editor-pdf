@@ -87,7 +87,11 @@ def blocks_from_tesseract_data(data: dict, page_num: int) -> list[TextBlock]:
 
 
 def _split_on_wide_gaps(indices: list[int], data: dict) -> list[list[int]]:
-    """Split one line's word indices into runs separated by column-sized gaps."""
+    """Split one line's word indices into runs.
+
+    A run ends at a column-sized gap, or right after a label (a word ending in
+    ":"), so a field value can be edited without retyping its label.
+    """
     ordered = sorted(indices, key=lambda i: data["left"][i])
     heights = sorted(data["height"][i] for i in ordered)
     max_gap = _COLUMN_GAP_FACTOR * heights[len(heights) // 2]  # median word height
@@ -95,7 +99,8 @@ def _split_on_wide_gaps(indices: list[int], data: dict) -> list[list[int]]:
     segments = [[ordered[0]]]
     for prev, cur in zip(ordered, ordered[1:]):
         gap = data["left"][cur] - (data["left"][prev] + data["width"][prev])
-        if gap > max_gap:
+        ends_label = data["text"][prev].strip().endswith(":")
+        if gap > max_gap or ends_label:
             segments.append([cur])
         else:
             segments[-1].append(cur)
