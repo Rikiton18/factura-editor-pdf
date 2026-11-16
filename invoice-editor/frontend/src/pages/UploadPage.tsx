@@ -178,7 +178,7 @@ export function UploadPage() {
               color: 'var(--info)',
             }}>
               <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>⟳</span>
-              Procesando PDF…
+              Procesando PDF… si es un escaneo, el OCR puede tardar hasta 2 minutos.
             </div>
           )}
           {scannedNotice && !loading && (
