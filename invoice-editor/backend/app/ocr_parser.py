@@ -18,6 +18,10 @@ from .models import TextBlock
 _RENDER_DPI = 300
 _PDF_POINTS_PER_INCH = 72.0
 _SCALE = _PDF_POINTS_PER_INCH / _RENDER_DPI  # 0.24 — converts pixel coords → PDF points
+_MIN_CONFIDENCE = 30
+# A gap wider than this many word-heights starts a new block. A normal space is
+# about 0.4 word-heights; table/column gaps are 2 or more.
+_COLUMN_GAP_FACTOR = 1.2
 
 
 def extract_blocks_ocr(pdf_bytes: bytes) -> list[TextBlock]:
@@ -53,39 +57,63 @@ def extract_blocks_ocr(pdf_bytes: bytes) -> list[TextBlock]:
                 config="--psm 6",
             )
 
-            # Group words into lines
-            lines: dict[tuple, list[int]] = defaultdict(list)
-            for i, conf in enumerate(data["conf"]):
-                if float(conf) < 30:
-                    continue
-                key = (data["block_num"][i], data["par_num"][i], data["line_num"][i])
-                lines[key].append(i)
-
-            for indices in lines.values():
-                words = [data["text"][i].strip() for i in indices if data["text"][i].strip()]
-                if not words:
-                    continue
-                text = " ".join(words)
-                x_min = min(data["left"][i] for i in indices) * _SCALE
-                y_min = min(data["top"][i] for i in indices) * _SCALE
-                x_max = max(data["left"][i] + data["width"][i] for i in indices) * _SCALE
-                y_max = max(data["top"][i] + data["height"][i] for i in indices) * _SCALE
-
-                blocks.append(TextBlock(
-                    block_id=str(uuid.uuid4()),
-                    page=page_num,
-                    x0=x_min,
-                    y0=y_min,
-                    x1=x_max,
-                    y1=y_max,
-                    text=text,
-                    font="Helvetica",  # OCR cannot detect original font
-                    size=12.0,         # Approximate; OCR does not give exact size
-                    color=(0.0, 0.0, 0.0),
-                    flags=0,
-                    editable=True,
-                ))
+            blocks.extend(blocks_from_tesseract_data(data, page_num))
     finally:
         doc.close()
 
     return blocks
+
+
+def blocks_from_tesseract_data(data: dict, page_num: int) -> list[TextBlock]:
+    """Turn pytesseract word boxes into editable blocks for one page.
+
+    Words are grouped by Tesseract line, then each line is cut wherever there is
+    a wide horizontal gap. With --psm 6 Tesseract calls everything on the same
+    visual row one "line", even when it spans several columns; without the cut,
+    editing one field would cover (and rewrite) the neighbouring columns too.
+    """
+    lines: dict[tuple, list[int]] = defaultdict(list)
+    for i, conf in enumerate(data["conf"]):
+        if float(conf) < _MIN_CONFIDENCE or not data["text"][i].strip():
+            continue
+        key = (data["block_num"][i], data["par_num"][i], data["line_num"][i])
+        lines[key].append(i)
+
+    blocks: list[TextBlock] = []
+    for indices in lines.values():
+        for segment in _split_on_wide_gaps(indices, data):
+            blocks.append(_segment_to_block(segment, data, page_num))
+    return blocks
+
+
+def _split_on_wide_gaps(indices: list[int], data: dict) -> list[list[int]]:
+    """Split one line's word indices into runs separated by column-sized gaps."""
+    ordered = sorted(indices, key=lambda i: data["left"][i])
+    heights = sorted(data["height"][i] for i in ordered)
+    max_gap = _COLUMN_GAP_FACTOR * heights[len(heights) // 2]  # median word height
+
+    segments = [[ordered[0]]]
+    for prev, cur in zip(ordered, ordered[1:]):
+        gap = data["left"][cur] - (data["left"][prev] + data["width"][prev])
+        if gap > max_gap:
+            segments.append([cur])
+        else:
+            segments[-1].append(cur)
+    return segments
+
+
+def _segment_to_block(indices: list[int], data: dict, page_num: int) -> TextBlock:
+    return TextBlock(
+        block_id=str(uuid.uuid4()),
+        page=page_num,
+        x0=min(data["left"][i] for i in indices) * _SCALE,
+        y0=min(data["top"][i] for i in indices) * _SCALE,
+        x1=max(data["left"][i] + data["width"][i] for i in indices) * _SCALE,
+        y1=max(data["top"][i] + data["height"][i] for i in indices) * _SCALE,
+        text=" ".join(data["text"][i].strip() for i in indices),
+        font="Helvetica",  # OCR cannot detect original font
+        size=12.0,         # Approximate; OCR does not give exact size
+        color=(0.0, 0.0, 0.0),
+        flags=0,
+        editable=True,
+    )
