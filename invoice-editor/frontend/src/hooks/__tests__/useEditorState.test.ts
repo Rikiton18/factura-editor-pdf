@@ -17,7 +17,7 @@ const block: TextBlock = {
 const initPayload = {
   sessionId: 'sess1',
   docType: 'regular' as const,
-  pdfBase64: 'abc',
+  pdfUrl: 'blob:http://localhost/abc',
   blocks: [block],
   pageCount: 1,
 }

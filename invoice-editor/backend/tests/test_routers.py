@@ -15,13 +15,12 @@ def test_upload_regular_pdf(minimal_pdf_bytes):
     assert response.status_code == 200
     data = response.json()
     assert "session_id" in data
-    assert "pdf_base64" in data
+    # Upload must NOT echo the PDF back: a base64 body made the response
+    # large enough to hit Render's HTTP timeout (frontend uses a blob URL).
+    assert "pdf_base64" not in data
     assert "blocks" in data
     assert data["page_count"] == 1
     assert len(data["blocks"]) >= 1
-    # Verify pdf_base64 is valid base64
-    decoded = base64.b64decode(data["pdf_base64"])
-    assert decoded[:4] == b"%PDF"
 
 
 def test_upload_rejects_invalid_doc_type(minimal_pdf_bytes):
