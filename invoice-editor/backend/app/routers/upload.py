@@ -39,6 +39,16 @@ async def upload_pdf(
             blocks = extract_blocks_ocr(pdf_bytes)
         except (ImportError, RuntimeError):
             blocks = extract_blocks(pdf_bytes)
+        except OSError as exc:
+            # pytesseract.TesseractNotFoundError subclasses OSError: the Python
+            # package is installed but the tesseract binary is not on this host.
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "El servidor no tiene OCR disponible, por eso no puede leer PDFs "
+                    "escaneados. Sube un PDF con texto seleccionable."
+                ),
+            ) from exc
     else:
         blocks = extract_blocks(pdf_bytes)
 

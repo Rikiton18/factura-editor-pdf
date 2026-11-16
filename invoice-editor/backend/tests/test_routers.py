@@ -103,3 +103,48 @@ def test_demo_reflects_edits(minimal_pdf_bytes):
     demo = client.get(f"/api/demo/{session_id}").json()
     texts = [b["text"] for b in demo["blocks"]]
     assert "DEMO_TEXT" in texts
+
+
+# ── Browser-visible errors ──────────────────────────────────────────────────
+# A bare 500 has no CORS headers, so the browser reports it as "Network Error"
+# and the UI wrongly says the backend is still starting up.
+
+_ORIGIN = {"Origin": "https://factura-editor-pdf.vercel.app"}
+
+
+def test_upload_scanned_pdf_without_tesseract_returns_503_with_cors(scanned_pdf_bytes, monkeypatch):
+    def _tesseract_missing(_pdf_bytes):
+        # pytesseract.TesseractNotFoundError subclasses OSError
+        raise OSError("tesseract is not installed or it's not in your PATH")
+
+    monkeypatch.setattr("app.ocr_parser.extract_blocks_ocr", _tesseract_missing)
+
+    response = client.post(
+        "/api/upload",
+        files={"file": ("scan.pdf", scanned_pdf_bytes, "application/pdf")},
+        data={"doc_type": "regular"},
+        headers=_ORIGIN,
+    )
+
+    assert response.status_code == 503
+    assert "OCR" in response.json()["detail"]
+    assert response.headers["access-control-allow-origin"] == "*"
+
+
+def test_unhandled_error_returns_json_500_with_cors(minimal_pdf_bytes, monkeypatch):
+    def _boom(_pdf_bytes):
+        raise ValueError("kaboom")
+
+    monkeypatch.setattr("app.routers.upload.extract_blocks", _boom)
+    lenient_client = TestClient(app, raise_server_exceptions=False)
+
+    response = lenient_client.post(
+        "/api/upload",
+        files={"file": ("t.pdf", minimal_pdf_bytes, "application/pdf")},
+        data={"doc_type": "regular"},
+        headers=_ORIGIN,
+    )
+
+    assert response.status_code == 500
+    assert response.headers["access-control-allow-origin"] == "*"
+    assert "detail" in response.json()

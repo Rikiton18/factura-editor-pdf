@@ -1,6 +1,6 @@
 import asyncio
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -29,6 +29,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    # Runs in ServerErrorMiddleware, outside CORSMiddleware, so the CORS header
+    # must be added by hand. Without it the browser hides any 500 behind a
+    # generic "Network Error".
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Error interno del servidor."},
+        headers={"Access-Control-Allow-Origin": "*"},
+    )
+
 
 app.include_router(upload_router, prefix="/api")
 app.include_router(export_router, prefix="/api")
