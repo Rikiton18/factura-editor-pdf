@@ -1,6 +1,36 @@
 import { useState } from 'react'
 import type { TextBlock } from '../types'
 
+// The exported PDF draws edits in Helvetica, so the page and the edit field use
+// the same face. Bold blocks are the ones the OCR measured as bold.
+const FONT_FAMILY = 'Helvetica, Arial, "Liberation Sans", sans-serif'
+const BOLD_FONT_NAME = 'Helvetica-Bold'
+
+// The original OCR box is often too small to read or type in, so the edit field
+// is a little larger than it, centred on it.
+const MIN_EDIT_HEIGHT_PX = 24
+const MIN_EDIT_WIDTH_PX = 80
+const EDIT_PADDING_PX = 6
+const EDIT_LINE_HEIGHT = 1.6 // field height as a multiple of the font size
+const AVG_CHAR_WIDTH_EM = 0.6 // generous average advance so typed text never clips
+
+const fontWeightOf = (block: TextBlock): 400 | 700 => (block.font === BOLD_FONT_NAME ? 700 : 400)
+
+function editFieldBox(block: TextBlock, text: string, scale: number) {
+  const fontPx = block.size * scale
+  const boxWidth = (block.x1 - block.x0) * scale
+  const boxHeight = (block.y1 - block.y0) * scale
+  const textWidth = text.length * fontPx * AVG_CHAR_WIDTH_EM
+  const width = Math.max(boxWidth, textWidth + 2 * EDIT_PADDING_PX, MIN_EDIT_WIDTH_PX)
+  const height = Math.max(boxHeight, fontPx * EDIT_LINE_HEIGHT, MIN_EDIT_HEIGHT_PX)
+  return {
+    left: block.x0 * scale,
+    top: block.y0 * scale - (height - boxHeight) / 2,
+    width,
+    height,
+  }
+}
+
 interface EditableOverlayProps {
   block: TextBlock
   editedText?: string
@@ -26,7 +56,8 @@ export function EditableOverlay({ block, editedText, onEdit, scale }: EditableOv
     padding: 0,
     margin: 0,
     overflow: 'hidden',
-    fontFamily: 'inherit',
+    fontFamily: FONT_FAMILY,
+    fontWeight: fontWeightOf(block),
   }
 
   if (active) {
@@ -35,9 +66,15 @@ export function EditableOverlay({ block, editedText, onEdit, scale }: EditableOv
         autoFocus
         style={{
           ...base,
+          ...editFieldBox(block, displayed, scale),
+          lineHeight: 'normal',
+          padding: `0 ${EDIT_PADDING_PX}px`,
+          overflow: 'visible',
           border: '1.5px solid #2563eb',
-          backgroundColor: 'rgba(255,255,255,0.95)',
+          backgroundColor: '#fff',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
           outline: 'none',
+          zIndex: 20,
         }}
         value={displayed}
         onChange={e => onEdit(block.block_id, e.target.value)}
@@ -91,6 +128,8 @@ export function PreviewOverlay({ block, editedText, scale }: PreviewOverlayProps
         width: (block.x1 - block.x0) * scale,
         height: (block.y1 - block.y0) * scale,
         backgroundColor: 'white',
+        fontFamily: FONT_FAMILY,
+        fontWeight: fontWeightOf(block),
         fontSize: block.size * scale,
         lineHeight: `${(block.y1 - block.y0) * scale}px`,
         overflow: 'hidden',
