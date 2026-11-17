@@ -3,7 +3,7 @@ from collections import defaultdict
 
 import fitz
 
-from .models import TextBlock
+from .models import BOLD_FONT_NAME, TextBlock
 
 
 def apply_edits(
@@ -43,19 +43,21 @@ def apply_edits(
         page.apply_redactions()
 
         # Phase 3: insert new text at original baseline
-        helv = fitz.Font("helv")
+        fonts = {"helv": fitz.Font("helv"), "hebo": fitz.Font("hebo")}
         for block, new_text in page_edits:
+            fontname = "hebo" if block.font == BOLD_FONT_NAME else "helv"
             fontsize = block.size
-            text_width = helv.text_length(new_text, fontsize=fontsize)
+            text_width = fonts[fontname].text_length(new_text, fontsize=fontsize)
             orig_width = block.x1 - block.x0
             if text_width > orig_width:
                 # Clear extra space so longer text isn't hidden behind existing content
                 clear_rect = fitz.Rect(block.x0, block.y0, block.x0 + text_width + 2, block.y1)
                 page.draw_rect(clear_rect, color=(1, 1, 1), fill=(1, 1, 1))
+            baseline = block.baseline if block.baseline is not None else block.y1 - 1.0
             page.insert_text(
-                (block.x0, block.y1 - 1.0),
+                (block.x0, baseline),
                 new_text,
-                fontname="helv",
+                fontname=fontname,
                 fontsize=fontsize,
                 color=block.color,
             )

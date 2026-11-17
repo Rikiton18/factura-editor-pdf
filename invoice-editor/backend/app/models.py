@@ -2,6 +2,9 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Literal
 
+# Font name carried by bold OCR blocks. The exporter draws these in Helvetica-Bold.
+BOLD_FONT_NAME = "Helvetica-Bold"
+
 
 @dataclass
 class TextBlock:
@@ -17,6 +20,8 @@ class TextBlock:
     color: tuple[float, float, float]
     flags: int
     editable: bool
+    # y of the text baseline in PDF points. None = derive it from y1 (text PDFs).
+    baseline: float | None = None
 
 
 @dataclass
