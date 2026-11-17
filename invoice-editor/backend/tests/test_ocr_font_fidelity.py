@@ -7,7 +7,8 @@ from PIL import Image
 
 from app.models import TextBlock
 from app.ocr_parser import (
-    _with_ink_metrics,
+    _with_ink_baseline,
+    _with_weight,
     BOLD_STROKE_RATIO,
     blocks_from_tesseract_data,
     estimate_font_size,
@@ -64,7 +65,12 @@ def test_short_text_trusts_height_because_bearings_shrink_the_width():
 def test_snap_sizes_merges_close_sizes_into_the_dominant_one():
     sizes = [8.0] * 5 + [8.4] * 3 + [7.6] * 2 + [15.4]
 
-    assert snap_sizes(sizes) == [8.0] * 10 + [15.5]
+    assert snap_sizes(sizes) == [8.0] * 10 + [15.0]
+
+
+def test_snap_sizes_rounds_to_whole_points_like_real_invoices():
+    # Reference invoice: 9 pt "RUC:" and 15 pt "Documento No Fiscal", OCR gave 9.4 and 15.4.
+    assert snap_sizes([9.4, 15.4]) == [9.0, 15.0]
 
 
 # ── blocks carry size and baseline ──────────────────────────────────────────
@@ -225,7 +231,7 @@ def test_tight_box_keeps_its_geometric_baseline():
     x0, y0, x1, y1 = _ink_box_pt(gray)
     block = _block(text="1/1", size=8.0, x0=x0, y0=y0, x1=x1, y1=y1, baseline=y1)
 
-    assert _with_ink_metrics(block, gray).baseline == block.baseline
+    assert _with_ink_baseline(block, gray).baseline == block.baseline
 
 
 def test_stretched_box_gets_its_baseline_from_the_image():
@@ -237,7 +243,38 @@ def test_stretched_box_gets_its_baseline_from_the_image():
     gray = _page_gray(draw)
     block = _block(text="Total", size=8.0, x0=10.0, y0=24.6, x1=34.0, y1=48.4, baseline=48.4)
 
-    assert _with_ink_metrics(block, gray).baseline == pytest.approx(40.0, abs=0.6)
+    assert _with_ink_baseline(block, gray).baseline == pytest.approx(40.0, abs=0.6)
+
+
+# ── bold text is sized with Helvetica-Bold widths ───────────────────────────
+
+def test_bold_text_width_is_measured_with_bold_metrics():
+    bold_width = fitz.Font("hebo").text_length("Descripcion", fontsize=8)
+
+    size = estimate_font_size("Descripcion", bold_width, (CAP + DESC) * 8, bold=True)
+
+    assert size == pytest.approx(8.0, abs=0.3)
+
+
+def test_weight_pass_flags_bold_and_corrects_the_size():
+    gray = _page_gray(lambda page: page.insert_text((10, 40), "Descripcion", fontname="hebo", fontsize=8))
+    x0, y0, x1, y1 = _ink_box_pt(gray)
+    # 8.6 is what regular-weight widths estimate for this bold text (it is ~7% wider).
+    block = _block(text="Descripcion", size=8.6, x0=x0, y0=y0, x1=x1, y1=y1)
+
+    result = _with_weight(block, gray)
+
+    assert result.font == "Helvetica-Bold"
+    assert result.flags & 16
+    assert result.size == pytest.approx(8.0, abs=0.4)
+
+
+def test_weight_pass_leaves_regular_text_alone():
+    gray = _page_gray(lambda page: page.insert_text((10, 40), "Descripcion", fontname="helv", fontsize=8))
+    x0, y0, x1, y1 = _ink_box_pt(gray)
+    block = _block(text="Descripcion", size=8.0, x0=x0, y0=y0, x1=x1, y1=y1)
+
+    assert _with_weight(block, gray) == block
 
 
 # ── table border pipes are not text ─────────────────────────────────────────

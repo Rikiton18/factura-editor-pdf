@@ -45,6 +45,7 @@ _RULE_FRACTION = 0.85      # a row/column inked this much is a table rule, not t
 _DENSE_ROW = 0.55          # rows with this share of the peak ink count are letter bodies
 _STRETCHED_BOX = 1.25      # a box this much taller than its text's ink includes table borders
 _HELVETICA = fitz.Font("helv")
+_HELVETICA_BOLD = fitz.Font("hebo")
 
 
 def extract_blocks_ocr(pdf_bytes: bytes) -> list[TextBlock]:
@@ -81,23 +82,26 @@ def extract_blocks_ocr(pdf_bytes: bytes) -> list[TextBlock]:
             )
 
             gray = img.convert("L")
-            blocks.extend(
-                _with_ink_metrics(block, gray)
-                for block in blocks_from_tesseract_data(data, page_num)
-            )
+            blocks.extend(blocks_from_tesseract_data(data, page_num, gray))
     finally:
         doc.close()
 
     return blocks
 
 
-def blocks_from_tesseract_data(data: dict, page_num: int) -> list[TextBlock]:
+def blocks_from_tesseract_data(
+    data: dict, page_num: int, gray: Image.Image | None = None
+) -> list[TextBlock]:
     """Turn pytesseract word boxes into editable blocks for one page.
 
     Words are grouped by Tesseract line, then each line is cut wherever there is
     a wide horizontal gap. With --psm 6 Tesseract calls everything on the same
     visual row one "line", even when it spans several columns; without the cut,
     editing one field would cover (and rewrite) the neighbouring columns too.
+
+    With `gray` (the page image) the weight and, for boxes stretched by table
+    borders, the baseline are read from the ink. Weight comes first because bold
+    text changes the size estimate, and sizes are then unified across the page.
     """
     lines: dict[tuple, list[int]] = defaultdict(list)
     for i, conf in enumerate(data["conf"]):
@@ -110,7 +114,12 @@ def blocks_from_tesseract_data(data: dict, page_num: int) -> list[TextBlock]:
     for indices in lines.values():
         for segment in _split_on_wide_gaps(indices, data):
             blocks.append(_segment_to_block(segment, data, page_num))
-    return _with_page_sizes(blocks)
+    if gray is not None:
+        blocks = [_with_weight(block, gray) for block in blocks]
+    blocks = _with_page_sizes(blocks)
+    if gray is not None:
+        blocks = [_with_ink_baseline(block, gray) for block in blocks]
+    return blocks
 
 
 def _split_on_wide_gaps(indices: list[int], data: dict) -> list[list[int]]:
@@ -168,8 +177,11 @@ def _ink_height_em(text: str) -> float:
     return top + (_DESCENDER_EM if _has_descender(text) else 0.0)
 
 
-def estimate_font_size(text: str, width_pt: float, height_pt: float) -> float:
+def estimate_font_size(text: str, width_pt: float, height_pt: float, *, bold: bool = False) -> float:
     """Font size (pt) of Helvetica-like text that fills a box of this size.
+
+    Bold text is about 7% wider than regular, so `bold` measures it with the
+    Helvetica-Bold advance widths; otherwise its size would come out inflated.
 
     From the box height, using the glyph classes present (caps/ascenders and
     descenders set how much of the em the ink covers). From the box width when
@@ -179,7 +191,7 @@ def estimate_font_size(text: str, width_pt: float, height_pt: float) -> float:
     text = text.strip()
     from_height = height_pt / _ink_height_em(text)
 
-    advance_per_pt = _HELVETICA.text_length(text, fontsize=1.0)
+    advance_per_pt = (_HELVETICA_BOLD if bold else _HELVETICA).text_length(text, fontsize=1.0)
     if len(text) < _MIN_CHARS_FOR_WIDTH or advance_per_pt <= 0:
         return from_height
     from_width = width_pt / advance_per_pt
@@ -189,12 +201,13 @@ def estimate_font_size(text: str, width_pt: float, height_pt: float) -> float:
 
 
 def snap_sizes(sizes: list[float]) -> list[float]:
-    """Round to 0.5 pt, then merge sizes within 10% into the most common one.
+    """Round to whole points, then merge sizes within 10% into the most common one.
 
-    One page rarely mixes 7.5, 8 and 8.5 pt body text; the spread is estimation
+    Invoices use whole-point sizes (the reference invoice is 8, 9 and 15 pt), and
+    one page rarely mixes 7.5, 8 and 8.5 pt body text; the spread is estimation
     noise, so the whole cluster takes the dominant size.
     """
-    rounded = [round(size * 2) / 2 for size in sizes]
+    rounded = [float(round(size)) for size in sizes]
     representatives: list[float] = []
     mapping: dict[float, float] = {}
     for size, _ in Counter(rounded).most_common():
@@ -266,23 +279,38 @@ def _ink_mask(gray: Image.Image) -> tuple[bytes, int, int]:
     return mask.tobytes(), gray.width, gray.height
 
 
-def _with_ink_metrics(block: TextBlock, gray: Image.Image) -> TextBlock:
-    """Set weight (bold flag and font) and baseline from the block's pixels."""
+def _crop_block(block: TextBlock, gray: Image.Image) -> tuple[Image.Image, int]:
+    """The block's pixels from the page image, and the crop's top row in the page."""
     px_per_pt = _RENDER_DPI / _PDF_POINTS_PER_INCH
     top_px = int(block.y0 * px_per_pt)
     crop = gray.crop((
         int(block.x0 * px_per_pt), top_px,
         int(block.x1 * px_per_pt) + 1, int(block.y1 * px_per_pt) + 1,
     ))
-    updates: dict = {}
-    if ink_stroke_ratio(crop, block.size) >= BOLD_STROKE_RATIO:
-        updates.update(font=BOLD_FONT_NAME, flags=block.flags | _BOLD_FLAG)
-    # A tight box already gives an exact baseline (its bottom, minus any descender).
-    # Only a box stretched by table borders needs the baseline read from the ink.
-    stretched = block.y1 - block.y0 > _STRETCHED_BOX * _ink_height_em(block.text) * block.size
-    row = ink_baseline_row(crop) if stretched else None
-    if row is not None:
-        measured = (top_px + row) / px_per_pt
-        if block.y0 <= measured <= block.y1 + 1.0:  # sanity: the baseline lies inside the box
-            updates["baseline"] = measured
-    return replace(block, **updates)
+    return crop, top_px
+
+
+def _with_weight(block: TextBlock, gray: Image.Image) -> TextBlock:
+    """Flag bold blocks and re-estimate their size with Helvetica-Bold widths."""
+    crop, _ = _crop_block(block, gray)
+    if ink_stroke_ratio(crop, block.size) < BOLD_STROKE_RATIO:
+        return block
+    size = estimate_font_size(block.text, block.x1 - block.x0, block.y1 - block.y0, bold=True)
+    return replace(block, font=BOLD_FONT_NAME, flags=block.flags | _BOLD_FLAG, size=size)
+
+
+def _with_ink_baseline(block: TextBlock, gray: Image.Image) -> TextBlock:
+    """Read the baseline from the ink when table borders stretched the box.
+
+    A tight box already gives an exact baseline (its bottom, minus any descender).
+    """
+    if block.y1 - block.y0 <= _STRETCHED_BOX * _ink_height_em(block.text) * block.size:
+        return block
+    crop, top_px = _crop_block(block, gray)
+    row = ink_baseline_row(crop)
+    if row is None:
+        return block
+    measured = (top_px + row) / (_RENDER_DPI / _PDF_POINTS_PER_INCH)
+    if not block.y0 <= measured <= block.y1 + 1.0:  # sanity: the baseline lies inside the box
+        return block
+    return replace(block, baseline=measured)
