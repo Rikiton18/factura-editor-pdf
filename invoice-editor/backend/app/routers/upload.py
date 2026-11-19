@@ -1,3 +1,4 @@
+import asyncio
 from dataclasses import asdict
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 import fitz
@@ -6,6 +7,42 @@ from ..pdf_parser import extract_blocks, is_scanned_pdf
 from ..session_store import create_session
 
 router = APIRouter()
+
+
+def _validate_pdf(pdf_bytes: bytes) -> None:
+    try:
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    except fitz.FileDataError:
+        raise ValueError("corrupt")
+    if doc.needs_pass:
+        doc.close()
+        raise ValueError("password")
+    doc.close()
+
+
+def _get_page_count(pdf_bytes: bytes) -> int:
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    n = len(doc)
+    doc.close()
+    return n
+
+
+async def _extract_blocks_async(pdf_bytes: bytes, scanned: bool):
+    if not scanned:
+        return await asyncio.to_thread(extract_blocks, pdf_bytes)
+    try:
+        from ..ocr_parser import extract_blocks_ocr
+        return await asyncio.to_thread(extract_blocks_ocr, pdf_bytes)
+    except (ImportError, RuntimeError):
+        return await asyncio.to_thread(extract_blocks, pdf_bytes)
+    except OSError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "El servidor no tiene OCR disponible, por eso no puede leer PDFs "
+                "escaneados. Sube un PDF con texto seleccionable."
+            ),
+        ) from exc
 
 
 @router.post("/upload")
@@ -22,45 +59,21 @@ async def upload_pdf(
         raise HTTPException(status_code=413, detail="PDF demasiado grande (máximo 20 MB).")
 
     try:
-        _doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-        if _doc.needs_pass:
-            _doc.close()
+        await asyncio.to_thread(_validate_pdf, pdf_bytes)
+    except ValueError as exc:
+        if "password" in str(exc):
             raise HTTPException(status_code=400, detail="PDF protegido con contraseña no soportado.")
-        _doc.close()
-    except fitz.FileDataError:
         raise HTTPException(status_code=400, detail="Archivo PDF inválido o corrupto.")
 
-    scanned = is_scanned_pdf(pdf_bytes)
-
-    if scanned:
-        # Phase 2 OCR path — gated; falls back to normal parser until pytesseract is installed
-        try:
-            from ..ocr_parser import extract_blocks_ocr
-            blocks = extract_blocks_ocr(pdf_bytes)
-        except (ImportError, RuntimeError):
-            blocks = extract_blocks(pdf_bytes)
-        except OSError as exc:
-            # pytesseract.TesseractNotFoundError subclasses OSError: the Python
-            # package is installed but the tesseract binary is not on this host.
-            raise HTTPException(
-                status_code=503,
-                detail=(
-                    "El servidor no tiene OCR disponible, por eso no puede leer PDFs "
-                    "escaneados. Sube un PDF con texto seleccionable."
-                ),
-            ) from exc
-    else:
-        blocks = extract_blocks(pdf_bytes)
+    scanned = await asyncio.to_thread(is_scanned_pdf, pdf_bytes)
+    blocks = await _extract_blocks_async(pdf_bytes, scanned)
+    page_count = await asyncio.to_thread(_get_page_count, pdf_bytes)
 
     session_id = create_session(doc_type, pdf_bytes, blocks)
-
-    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-    page_count = len(doc)
-    doc.close()
 
     return {
         "session_id": session_id,
         "blocks": [asdict(b) for b in blocks],
         "page_count": page_count,
-        "scanned": scanned,  # frontend can show "Modo OCR" badge
+        "scanned": scanned,
     }
