@@ -39,8 +39,13 @@ def apply_edits(
             rect = fitz.Rect(block.x0, block.y0, block.x1, block.y1)
             page.add_redact_annot(rect, fill=(1, 1, 1))
 
-        # Phase 2: apply all redactions at once — PDF_REDACT_IMAGE_NONE=0 preserves images
-        page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
+        # Phase 2: apply all redactions at once
+        # PDF_REDACT_IMAGE_NONE=0 preserves raster images
+        # PDF_REDACT_LINE_ART_NONE=0 preserves vector graphics (logos, shapes)
+        page.apply_redactions(
+            images=fitz.PDF_REDACT_IMAGE_NONE,
+            graphics=fitz.PDF_REDACT_LINE_ART_NONE,
+        )
 
         # Phase 3: insert new text at original baseline
         fonts = {"helv": fitz.Font("helv"), "hebo": fitz.Font("hebo")}
