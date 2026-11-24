@@ -12,7 +12,7 @@ export function EditorPage() {
   const { sessionId } = useParams<{ sessionId: string }>()
   const location = useLocation()
   const navigate = useNavigate()
-  const { state, init, edit, reset, setExporting } = useEditorState()
+  const { state, init, edit, setFont, reset, setExporting } = useEditorState()
   const { exportAndDownload, previewPdf, exportError } = useExport(state, setExporting)
   const [showPreview, setShowPreview] = useState(true)
   const [showHelp, setShowHelp] = useState(false)
@@ -115,7 +115,9 @@ export function EditorPage() {
                       key={b.block_id}
                       block={b}
                       editedText={state.edits.get(b.block_id)}
+                      font={state.fonts.get(b.block_id)}
                       onEdit={edit}
+                      onFontChange={setFont}
                       scale={scale}
                     />
                   ))}
@@ -163,6 +165,7 @@ export function EditorPage() {
                           key={b.block_id}
                           block={b}
                           editedText={state.edits.get(b.block_id)!}
+                          font={state.fonts.get(b.block_id)}
                           scale={scale}
                         />
                       ))}

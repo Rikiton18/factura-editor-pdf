@@ -45,6 +45,60 @@ test('reset clears edits', () => {
   expect(result.current.state.edits.size).toBe(0)
 })
 
+test('setFont marks the block as modified and keeps its original text', () => {
+  const { result } = renderHook(() => useEditorState())
+  act(() => result.current.init(initPayload))
+  act(() => result.current.setFont('b1', 'Courier-Bold'))
+  expect(result.current.state.fonts.get('b1')).toBe('Courier-Bold')
+  expect(result.current.state.edits.get('b1')).toBe('Original')
+})
+
+test('setFont keeps the text already typed', () => {
+  const { result } = renderHook(() => useEditorState())
+  act(() => result.current.init(initPayload))
+  act(() => result.current.edit('b1', 'Nuevo'))
+  act(() => result.current.setFont('b1', 'Courier'))
+  expect(result.current.state.edits.get('b1')).toBe('Nuevo')
+})
+
+test('choosing the detected font again clears the override and the edit', () => {
+  const { result } = renderHook(() => useEditorState())
+  act(() => result.current.init(initPayload))
+  act(() => result.current.setFont('b1', 'Courier'))
+  act(() => result.current.setFont('b1', 'Helvetica'))
+  expect(result.current.state.fonts.has('b1')).toBe(false)
+  expect(result.current.state.edits.has('b1')).toBe(false)
+})
+
+test('choosing the detected font again keeps a text edit', () => {
+  const { result } = renderHook(() => useEditorState())
+  act(() => result.current.init(initPayload))
+  act(() => result.current.edit('b1', 'Nuevo'))
+  act(() => result.current.setFont('b1', 'Courier'))
+  act(() => result.current.setFont('b1', 'Helvetica'))
+  expect(result.current.state.fonts.has('b1')).toBe(false)
+  expect(result.current.state.edits.get('b1')).toBe('Nuevo')
+})
+
+test('typing the original text back keeps a block that has a font override', () => {
+  const { result } = renderHook(() => useEditorState())
+  act(() => result.current.init(initPayload))
+  act(() => result.current.edit('b1', 'Nuevo'))
+  act(() => result.current.setFont('b1', 'Courier'))
+  act(() => result.current.edit('b1', 'Original'))
+  expect(result.current.state.edits.get('b1')).toBe('Original')
+  expect(result.current.state.fonts.get('b1')).toBe('Courier')
+})
+
+test('reset clears font overrides too', () => {
+  const { result } = renderHook(() => useEditorState())
+  act(() => result.current.init(initPayload))
+  act(() => result.current.setFont('b1', 'Courier'))
+  act(() => result.current.reset())
+  expect(result.current.state.fonts.size).toBe(0)
+  expect(result.current.state.edits.size).toBe(0)
+})
+
 test('setExporting updates flag', () => {
   const { result } = renderHook(() => useEditorState())
   act(() => result.current.setExporting(true))

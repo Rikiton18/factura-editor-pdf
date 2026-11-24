@@ -11,7 +11,7 @@ export interface UploadResponse {
 }
 
 export interface ExportRequest {
-  edits: { block_id: string; new_text: string }[]
+  edits: { block_id: string; new_text: string; font?: string }[]
   regenerate_qr: boolean
 }
 

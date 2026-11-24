@@ -12,14 +12,18 @@ function base64ToBlob(b64: string, mime = 'application/pdf'): Blob {
 export function useExport(state: EditorState, setExporting: (v: boolean) => void) {
   const [exportError, setExportError] = useState<string | null>(null)
 
+  const buildEdits = () =>
+    Array.from(state.edits.entries()).map(([block_id, new_text]) => ({
+      block_id,
+      new_text,
+      font: state.fonts.get(block_id), // undefined = keep the font detected for the block
+    }))
+
   const exportAndDownload = async (regenerateQr: boolean) => {
     setExporting(true)
     setExportError(null)
     try {
-      const edits = Array.from(state.edits.entries()).map(([block_id, new_text]) => ({
-        block_id,
-        new_text,
-      }))
+      const edits = buildEdits()
       const { data } = await exportPDF(state.sessionId, { edits, regenerate_qr: regenerateQr })
       const blob = base64ToBlob(data.pdf_base64)
       const url = URL.createObjectURL(blob)
@@ -44,10 +48,7 @@ export function useExport(state: EditorState, setExporting: (v: boolean) => void
     setExporting(true)
     setExportError(null)
     try {
-      const edits = Array.from(state.edits.entries()).map(([block_id, new_text]) => ({
-        block_id,
-        new_text,
-      }))
+      const edits = buildEdits()
       const { data } = await exportPDF(state.sessionId, { edits, regenerate_qr: regenerateQr })
       const blob = base64ToBlob(data.pdf_base64)
       const url = URL.createObjectURL(blob)

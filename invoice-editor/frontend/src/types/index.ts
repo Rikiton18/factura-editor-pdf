@@ -19,6 +19,7 @@ export interface EditorState {
   pdfUrl: string
   blocks: TextBlock[]
   edits: Map<string, string>
+  fonts: Map<string, string> // font picked per block; absent = the one detected
   isExporting: boolean
   pageCount: number
 }

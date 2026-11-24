@@ -100,6 +100,75 @@ test('edited text shown on the page keeps the font and weight', () => {
   expect(shown.style.fontWeight).toBe('700')
 })
 
+// ── choosing a font while editing ────────────────────────────────────────────
+
+function openEditorWithFonts(props: { font?: string; onFontChange?: (id: string, font: string) => void }) {
+  render(<EditableOverlay block={block} onEdit={vi.fn()} scale={1} {...props} />)
+  fireEvent.click(screen.getByText(block.text))
+}
+
+test('shows the four font choices while editing', () => {
+  openEditorWithFonts({ onFontChange: vi.fn() })
+
+  for (const name of ['Helvetica', 'Helvetica negrita', 'Courier', 'Courier negrita']) {
+    expect(screen.getByRole('button', { name })).toBeInTheDocument()
+  }
+})
+
+test('choosing a font reports it and keeps the editor open', () => {
+  const onFontChange = vi.fn()
+  openEditorWithFonts({ onFontChange })
+
+  fireEvent.click(screen.getByRole('button', { name: 'Courier negrita' }))
+
+  expect(onFontChange).toHaveBeenCalledWith('b1', 'Courier-Bold')
+  expect(screen.getByRole('textbox')).toBeInTheDocument()
+})
+
+test('font buttons do not take focus away from the edit field', () => {
+  openEditorWithFonts({ onFontChange: vi.fn() })
+
+  // fireEvent returns false when the event's default was prevented
+  expect(fireEvent.mouseDown(screen.getByRole('button', { name: 'Courier' }))).toBe(false)
+})
+
+test('the font in use is marked as pressed', () => {
+  openEditorWithFonts({ font: 'Courier', onFontChange: vi.fn() })
+
+  expect(screen.getByRole('button', { name: 'Courier' })).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.getByRole('button', { name: 'Helvetica' })).toHaveAttribute('aria-pressed', 'false')
+})
+
+test('no font choices are shown when nothing handles the change', () => {
+  openEditorWithFonts({})
+
+  expect(screen.queryByRole('button', { name: 'Courier' })).not.toBeInTheDocument()
+})
+
+test('the chosen font changes the edit field typeface and weight', () => {
+  openEditorWithFonts({ font: 'Courier-Bold', onFontChange: vi.fn() })
+  const input = screen.getByRole('textbox') as HTMLInputElement
+
+  expect(input.style.fontFamily).toMatch(/Courier/)
+  expect(input.style.fontWeight).toBe('700')
+})
+
+test('edited text on the page uses the chosen font', () => {
+  render(<EditableOverlay block={block} editedText="Nuevo" font="Courier" onEdit={vi.fn()} scale={1} />)
+  const shown = screen.getByText('Nuevo')
+
+  expect(shown.style.fontFamily).toMatch(/Courier/)
+  expect(shown.style.fontWeight).toBe('400')
+})
+
+test('preview overlay uses the chosen font', () => {
+  render(<PreviewOverlay block={block} editedText="Listo" font="Courier-Bold" scale={1} />)
+  const shown = screen.getByText('Listo')
+
+  expect(shown.style.fontFamily).toMatch(/Courier/)
+  expect(shown.style.fontWeight).toBe('700')
+})
+
 test('preview overlay keeps the font and weight', () => {
   render(<PreviewOverlay block={boldBlock} editedText="Listo" scale={1} />)
   const shown = screen.getByText('Listo')
