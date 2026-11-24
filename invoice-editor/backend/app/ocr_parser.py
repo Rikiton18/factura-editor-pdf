@@ -16,7 +16,7 @@ from collections import Counter, defaultdict
 from dataclasses import replace
 
 import fitz
-from PIL import Image
+from PIL import Image, ImageChops, ImageDraw, ImageFilter
 from .models import BOLD_FONT_NAME, TextBlock
 
 _RENDER_DPI = 300
@@ -44,6 +44,11 @@ _INK_RUN = re.compile(b"\xff+")
 _RULE_FRACTION = 0.85      # a row/column inked this much is a table rule, not text
 _DENSE_ROW = 0.55          # rows with this share of the peak ink count are letter bodies
 _STRETCHED_BOX = 1.25      # a box this much taller than its text's ink includes table borders
+_MASK_PADDING_PX = 3            # margin around found words when hiding them for the second pass
+_SURE_CONFIDENCE = 60   # below this a read is a guess (logos, frames, rounded corners); real text scores 89+
+_RESIDUAL_BLOCK_OFFSET = 10_000  # keeps second-pass block numbers apart from the first pass's
+_RULE_LENGTH_FRACTION = 0.024   # of the page size: a straight line this long is a table rule, not a letter stem
+_SINGLE_CHAR_MIN_CONFIDENCE = 60  # a lone character below this is usually an arc of a rounded table corner
 _HELVETICA = fitz.Font("helv")
 _HELVETICA_BOLD = fitz.Font("hebo")
 
@@ -73,20 +78,152 @@ def extract_blocks_ocr(pdf_bytes: bytes) -> list[TextBlock]:
             mat = fitz.Matrix(_RENDER_DPI / _PDF_POINTS_PER_INCH, _RENDER_DPI / _PDF_POINTS_PER_INCH)
             pix = page.get_pixmap(matrix=mat)
             img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            gray = img.convert("L")
+            # Tesseract can read none of a bordered table's text while its rules are there.
+            clean = remove_table_rules(gray)
 
             data = pytesseract.image_to_data(
-                img,
+                clean,
                 output_type=pytesseract.Output.DICT,
                 lang="spa",
                 config="--psm 6",
             )
 
-            gray = img.convert("L")
+            data = _with_missed_words(clean, data)
             blocks.extend(blocks_from_tesseract_data(data, page_num, gray))
     finally:
         doc.close()
 
     return blocks
+
+
+def remove_table_rules(gray: Image.Image) -> Image.Image:
+    """The page with the long straight lines of tables painted white.
+
+    Tesseract's page analysis can fail on a bordered table and then read none of
+    its text, for example the lone "455" of a narrow quantity cell. A line this
+    long is far longer than any letter stem at invoice type sizes, so removing
+    it leaves the text intact.
+    """
+    gray = gray.convert("L")
+    ink = gray.point(lambda value: 255 if value < 128 else 0)
+    vertical = _straight_runs(ink, max(2, round(_RULE_LENGTH_FRACTION * gray.height)), vertical=True)
+    horizontal = _straight_runs(ink, max(2, round(_RULE_LENGTH_FRACTION * gray.width)), vertical=False)
+    rules = ImageChops.lighter(vertical, horizontal).filter(ImageFilter.MaxFilter(3))  # soft edges too
+    return ImageChops.lighter(gray, rules)
+
+
+def _straight_runs(ink: Image.Image, length: int, *, vertical: bool) -> Image.Image:
+    """The ink pixels that lie on a straight run of at least `length` pixels.
+
+    A morphological opening along one axis (erode, then dilate back), built from
+    shifted copies of the image and doubled windows so it stays fast on a full page.
+    """
+    def shifted(image: Image.Image, amount: int) -> Image.Image:
+        return ImageChops.offset(image, 0, amount) if vertical else ImageChops.offset(image, amount, 0)
+
+    eroded, window = ink, 1  # a pixel survives only if the next `length` pixels are all ink
+    while window * 2 <= length:
+        eroded = ImageChops.darker(eroded, shifted(eroded, -window))
+        window *= 2
+    eroded = ImageChops.darker(eroded, shifted(eroded, -(length - window)))
+
+    dilated, window = eroded, 1  # spread each survivor back over the run it started
+    while window * 2 <= length:
+        dilated = ImageChops.lighter(dilated, shifted(dilated, window))
+        window *= 2
+    return ImageChops.lighter(dilated, shifted(dilated, length - window))
+
+
+def _is_block_word(data: dict, i: int) -> bool:
+    """Whether word i of a Tesseract table becomes part of a block."""
+    text = _word_text(data, i)
+    if not text:
+        return False
+    confidence = float(data["conf"][i])
+    if confidence < _MIN_CONFIDENCE:
+        return False
+    return len(text) > 1 or confidence >= _SINGLE_CHAR_MIN_CONFIDENCE
+
+
+def _is_sure(data: dict, i: int) -> bool:
+    """A block word read with high confidence, as opposed to a doubtful guess."""
+    return _is_block_word(data, i) and float(data["conf"][i]) >= _SURE_CONFIDENCE
+
+
+def _boxes_overlap(a: dict, i: int, b: dict, j: int) -> bool:
+    """Whether word i of table a and word j of table b have overlapping boxes."""
+    return (
+        a["left"][i] < b["left"][j] + b["width"][j] and b["left"][j] < a["left"][i] + a["width"][i]
+        and a["top"][i] < b["top"][j] + b["height"][j] and b["top"][j] < a["top"][i] + a["height"][i]
+    )
+
+
+def _with_missed_words(img: Image.Image, data: dict) -> dict:
+    """Add the words Tesseract skipped on the first pass.
+
+    --psm 6 cannot segment some text, such as a number alone in a bordered table
+    cell or a bold heading next to a logo, and that text then cannot be edited.
+    Hiding what the first pass found and reading the rest in sparse mode
+    (--psm 11) recovers it. Only confident reads are kept, since sparse mode also
+    guesses at logos and frames.
+    """
+    import pytesseract
+
+    residual = pytesseract.image_to_data(
+        mask_found_words(img, data),
+        output_type=pytesseract.Output.DICT,
+        lang="spa",
+        config="--psm 11",
+    )
+    return merge_residual_words(data, residual)
+
+
+def mask_found_words(img: Image.Image, data: dict) -> Image.Image:
+    """A copy of the page with every word that became a block painted white."""
+    masked = img.copy()
+    draw = ImageDraw.Draw(masked)
+    pad = _MASK_PADDING_PX
+    for i in range(len(data["conf"])):
+        if not _is_sure(data, i):  # doubtful words stay visible so the second pass can reread them
+            continue
+        left, top = data["left"][i], data["top"][i]
+        draw.rectangle(
+            (left - pad, top - pad, left + data["width"][i] + pad, top + data["height"][i] + pad),
+            fill="white",
+        )
+    return masked
+
+
+def merge_residual_words(data: dict, residual: dict) -> dict:
+    """The first-pass words plus the sure second-pass words, as one word table.
+
+    A sure second-pass word replaces any doubtful first-pass guess it covers (a scan
+    read "DV: 29" as "sosa" at confidence 31). Where the first pass was already
+    sure, the second pass adds nothing. Both passes number their blocks from 1, so
+    the second pass's block numbers are shifted; otherwise its words would join
+    first-pass lines that share a number.
+    """
+    sure_first = [i for i in range(len(data["conf"])) if _is_sure(data, i)]
+    added = [
+        j for j, conf in enumerate(residual["conf"])
+        if float(conf) >= _SURE_CONFIDENCE and _word_text(residual, j)
+        and not any(_boxes_overlap(data, i, residual, j) for i in sure_first)
+    ]
+    replaced = {
+        i for i in range(len(data["conf"]))
+        if any(_boxes_overlap(data, i, residual, j) for j in added)
+    }
+    merged = {
+        key: [value for i, value in enumerate(values) if i not in replaced]
+        for key, values in data.items()
+    }
+    for key, values in merged.items():
+        picked = [residual[key][j] for j in added]
+        if key == "block_num":
+            picked = [number + _RESIDUAL_BLOCK_OFFSET for number in picked]
+        values.extend(picked)
+    return merged
 
 
 def blocks_from_tesseract_data(
@@ -104,8 +241,8 @@ def blocks_from_tesseract_data(
     text changes the size estimate, and sizes are then unified across the page.
     """
     lines: dict[tuple, list[int]] = defaultdict(list)
-    for i, conf in enumerate(data["conf"]):
-        if float(conf) < _MIN_CONFIDENCE or not _word_text(data, i):
+    for i in range(len(data["conf"])):
+        if not _is_block_word(data, i):
             continue
         key = (data["block_num"][i], data["par_num"][i], data["line_num"][i])
         lines[key].append(i)
