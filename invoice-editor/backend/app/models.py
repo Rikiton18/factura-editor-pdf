@@ -5,6 +5,16 @@ from typing import Literal
 # Font name carried by bold OCR blocks. The exporter draws these in Helvetica-Bold.
 BOLD_FONT_NAME = "Helvetica-Bold"
 
+# Fonts an edit can be drawn in (base-14 PDF fonts, so nothing is embedded) and
+# the PyMuPDF name of each. The editor offers exactly these.
+FontName = Literal["Helvetica", "Helvetica-Bold", "Courier", "Courier-Bold"]
+FITZ_FONTS: dict[str, str] = {
+    "Helvetica": "helv",
+    "Helvetica-Bold": "hebo",
+    "Courier": "cour",
+    "Courier-Bold": "cobo",
+}
+
 
 @dataclass
 class TextBlock:

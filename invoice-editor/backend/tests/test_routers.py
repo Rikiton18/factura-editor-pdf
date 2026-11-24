@@ -1,4 +1,5 @@
 import base64
+import fitz
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
@@ -148,3 +149,48 @@ def test_unhandled_error_returns_json_500_with_cors(minimal_pdf_bytes, monkeypat
     assert response.status_code == 500
     assert response.headers["access-control-allow-origin"] == "*"
     assert "detail" in response.json()
+
+
+# ── font chosen per edit ────────────────────────────────────────────────────
+
+def _export_with_font(minimal_pdf_bytes, font):
+    upload_data = _upload(client, minimal_pdf_bytes)
+    block_id = upload_data["blocks"][0]["block_id"]
+    return client.post(
+        f"/api/export/{upload_data['session_id']}",
+        json={
+            "edits": [{"block_id": block_id, "new_text": "NUEVO", "font": font}],
+            "regenerate_qr": False,
+        },
+    )
+
+
+def test_export_draws_the_font_chosen_for_an_edit(minimal_pdf_bytes):
+    response = _export_with_font(minimal_pdf_bytes, "Courier-Bold")
+
+    assert response.status_code == 200
+    page = fitz.open(stream=base64.b64decode(response.json()["pdf_base64"]), filetype="pdf")[0]
+    fonts = {
+        span["font"]
+        for block in page.get_text("dict")["blocks"]
+        for line in block.get("lines", [])
+        for span in line["spans"]
+        if span["text"] == "NUEVO"
+    }
+    assert fonts == {"Courier-Bold"}
+
+
+def test_export_rejects_a_font_that_is_not_offered(minimal_pdf_bytes):
+    assert _export_with_font(minimal_pdf_bytes, "Comic-Sans").status_code == 422
+
+
+def test_export_still_works_without_a_font(minimal_pdf_bytes):
+    upload_data = _upload(client, minimal_pdf_bytes)
+    block_id = upload_data["blocks"][0]["block_id"]
+
+    response = client.post(
+        f"/api/export/{upload_data['session_id']}",
+        json={"edits": [{"block_id": block_id, "new_text": "NUEVO"}], "regenerate_qr": False},
+    )
+
+    assert response.status_code == 200

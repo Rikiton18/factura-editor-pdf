@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from ..config import settings
 from ..demo_extractor import get_demo_data
 from ..demo_store import save_demo_snapshot
+from ..models import FontName
 from ..pdf_exporter import apply_edits
 from ..qr_generator import replace_qr_in_doc
 from ..session_store import get_session, update_session_edits
@@ -18,6 +19,7 @@ router = APIRouter()
 class EditItem(BaseModel):
     block_id: str
     new_text: str
+    font: FontName | None = None  # None = keep the font detected for the block
 
 
 class ExportRequest(BaseModel):
@@ -32,7 +34,7 @@ async def export_pdf(session_id: str, req: ExportRequest):
         raise HTTPException(status_code=404, detail="Session not found")
 
     blocks_map = {b.block_id: b for b in session.blocks}
-    edit_dicts = [{"block_id": e.block_id, "new_text": e.new_text} for e in req.edits]
+    edit_dicts = [{"block_id": e.block_id, "new_text": e.new_text, "font": e.font} for e in req.edits]
 
     pdf_bytes = apply_edits(session.pdf_bytes, edit_dicts, blocks_map, doc_type=session.doc_type)
 

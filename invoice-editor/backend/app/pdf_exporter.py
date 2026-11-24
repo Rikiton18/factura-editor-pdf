@@ -3,7 +3,7 @@ from collections import defaultdict
 
 import fitz
 
-from .models import BOLD_FONT_NAME, TextBlock
+from .models import FITZ_FONTS, TextBlock
 
 
 def apply_edits(
@@ -25,18 +25,19 @@ def apply_edits(
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
 
     # Group edits by page so apply_redactions runs once per page
-    edits_by_page: dict[int, list[tuple[TextBlock, str]]] = defaultdict(list)
+    edits_by_page: dict[int, list[tuple[TextBlock, str, str]]] = defaultdict(list)
     for edit in edits:
         block = blocks_map.get(edit["block_id"])
         if block is not None:
-            edits_by_page[block.page].append((block, edit["new_text"]))
+            # The font picked for an edit wins over the block's own; unknown names draw as Helvetica.
+            fontname = FITZ_FONTS.get(edit.get("font") or block.font, "helv")
+            edits_by_page[block.page].append((block, edit["new_text"], fontname))
 
     for page_num, page_edits in edits_by_page.items():
         page = doc[page_num]
 
-        fonts = {"helv": fitz.Font("helv"), "hebo": fitz.Font("hebo")}
-        for block, new_text in page_edits:
-            fontname = "hebo" if block.font == BOLD_FONT_NAME else "helv"
+        fonts = {name: fitz.Font(name) for name in FITZ_FONTS.values()}
+        for block, new_text, fontname in page_edits:
             fontsize = block.size
             text_width = fonts[fontname].text_length(new_text, fontsize=fontsize)
             orig_width = block.x1 - block.x0

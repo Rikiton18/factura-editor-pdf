@@ -148,8 +148,11 @@ def _block(**overrides):
     return TextBlock(**base)
 
 
-def _new_span(minimal_pdf_bytes, block):
-    out = apply_edits(minimal_pdf_bytes, [{"block_id": "b1", "new_text": "NUEVO"}], {"b1": block})
+def _new_span(minimal_pdf_bytes, block, font=None):
+    edit = {"block_id": "b1", "new_text": "NUEVO"}
+    if font is not None:
+        edit["font"] = font
+    out = apply_edits(minimal_pdf_bytes, [edit], {"b1": block})
     return next(s for s in _spans(out) if s["text"] == "NUEVO")
 
 
@@ -176,6 +179,28 @@ def test_exporter_falls_back_to_bottom_minus_one_without_baseline(minimal_pdf_by
     span = _new_span(minimal_pdf_bytes, _block())
 
     assert span["origin"][1] == pytest.approx(101.0, abs=0.05)
+
+
+# ── a font picked for the edit wins over the block's detected font ──────────
+
+@pytest.mark.parametrize("font", ["Helvetica", "Helvetica-Bold", "Courier", "Courier-Bold"])
+def test_exporter_draws_the_font_chosen_for_the_edit(minimal_pdf_bytes, font):
+    span = _new_span(minimal_pdf_bytes, _block(), font=font)
+
+    assert span["font"] == font
+    assert span["size"] == pytest.approx(9.0, abs=0.01)
+
+
+def test_exporter_font_choice_overrides_the_block_font(minimal_pdf_bytes):
+    span = _new_span(minimal_pdf_bytes, _block(font="Helvetica-Bold", flags=16), font="Courier")
+
+    assert span["font"] == "Courier"
+
+
+def test_exporter_falls_back_to_helvetica_for_an_unknown_font_name(minimal_pdf_bytes):
+    span = _new_span(minimal_pdf_bytes, _block(), font="Comic-Sans")
+
+    assert span["font"] == "Helvetica"
 
 
 # ── baseline measured on the image, robust to table rules ───────────────────
