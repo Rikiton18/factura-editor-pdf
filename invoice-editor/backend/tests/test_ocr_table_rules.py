@@ -4,9 +4,10 @@ With the rules in place Tesseract can fail to read any text of a bordered table,
 for example the lone "455" in a narrow quantity cell. PIL-only image tests, no
 tesseract binary.
 """
+import pytest
 from PIL import Image, ImageChops, ImageDraw
 
-from app.ocr_parser import remove_table_rules
+from app.ocr_parser import find_table_rules, remove_table_rules, vertical_rule_xs
 
 WIDTH, HEIGHT = 600, 1000
 MIN_LEN = round(0.024 * HEIGHT)  # 24 px: a line at least this long is a rule, not a glyph stem
@@ -67,6 +68,29 @@ def test_the_input_image_is_not_modified():
     remove_table_rules(page)
 
     assert page.getpixel((101, 350)) == 0
+
+
+def test_the_vertical_rules_crossing_a_row_are_located():
+    page = _page((100, 200, 102, 500), (300, 200, 302, 500), (50, 240, 53, 250))  # two rules, one stem
+    vertical, _ = find_table_rules(page)
+
+    xs = vertical_rule_xs(vertical, 350)
+
+    assert xs == [pytest.approx(101, abs=1.5), pytest.approx(301, abs=1.5)]
+
+
+def test_no_rule_is_reported_on_a_row_outside_the_rules():
+    vertical, _ = find_table_rules(_page((100, 200, 102, 500)))
+
+    assert vertical_rule_xs(vertical, 700) == []
+
+
+def test_removing_rules_with_precomputed_masks_gives_the_same_page():
+    page = _page((100, 200, 102, 500), (100, 300, 500, 302))
+
+    same = remove_table_rules(page, find_table_rules(page))
+
+    assert ImageChops.difference(same, remove_table_rules(page)).getbbox() is None
 
 
 def test_a_whole_table_loses_its_grid_but_keeps_the_numbers():

@@ -32,6 +32,12 @@ class TextBlock:
     editable: bool
     # y of the text baseline in PDF points. None = derive it from y1 (text PDFs).
     baseline: float | None = None
+    # How the text sits in its table cell, and the x of the cell's borders (None = no
+    # border found on that side). The exporter keeps an edit anchored the same way and
+    # clear of the borders.
+    align: str = "left"  # "left" | "right" | "center"
+    limit_x0: float | None = None
+    limit_x1: float | None = None
 
 
 @dataclass

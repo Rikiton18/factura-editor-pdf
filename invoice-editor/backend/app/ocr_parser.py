@@ -17,6 +17,7 @@ from dataclasses import replace
 
 import fitz
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
+from .alignment import assign_alignment
 from .models import BOLD_FONT_NAME, TextBlock
 
 _RENDER_DPI = 300
@@ -80,7 +81,8 @@ def extract_blocks_ocr(pdf_bytes: bytes) -> list[TextBlock]:
             img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
             gray = img.convert("L")
             # Tesseract can read none of a bordered table's text while its rules are there.
-            clean = remove_table_rules(gray)
+            rules = find_table_rules(gray)
+            clean = remove_table_rules(gray, rules)
 
             data = pytesseract.image_to_data(
                 clean,
@@ -90,27 +92,45 @@ def extract_blocks_ocr(pdf_bytes: bytes) -> list[TextBlock]:
             )
 
             data = _with_missed_words(clean, data)
-            blocks.extend(blocks_from_tesseract_data(data, page_num, gray))
+            page_blocks = blocks_from_tesseract_data(data, page_num, gray)
+            blocks.extend(_with_alignment(page_blocks, rules[0]))
     finally:
         doc.close()
 
     return blocks
 
 
-def remove_table_rules(gray: Image.Image) -> Image.Image:
-    """The page with the long straight lines of tables painted white.
+def find_table_rules(gray: Image.Image) -> tuple[Image.Image, Image.Image]:
+    """The long straight lines of tables, as two masks (255 on a rule): vertical, horizontal.
 
-    Tesseract's page analysis can fail on a bordered table and then read none of
-    its text, for example the lone "455" of a narrow quantity cell. A line this
-    long is far longer than any letter stem at invoice type sizes, so removing
-    it leaves the text intact.
+    A line this long is far longer than any letter stem at invoice type sizes.
     """
     gray = gray.convert("L")
     ink = gray.point(lambda value: 255 if value < 128 else 0)
     vertical = _straight_runs(ink, max(2, round(_RULE_LENGTH_FRACTION * gray.height)), vertical=True)
     horizontal = _straight_runs(ink, max(2, round(_RULE_LENGTH_FRACTION * gray.width)), vertical=False)
-    rules = ImageChops.lighter(vertical, horizontal).filter(ImageFilter.MaxFilter(3))  # soft edges too
-    return ImageChops.lighter(gray, rules)
+    return vertical, horizontal
+
+
+def remove_table_rules(
+    gray: Image.Image, rules: tuple[Image.Image, Image.Image] | None = None
+) -> Image.Image:
+    """The page with the long straight lines of tables painted white.
+
+    Tesseract's page analysis can fail on a bordered table and then read none of
+    its text, for example the lone "455" of a narrow quantity cell. Removing the
+    rules leaves the text intact. Pass `rules` (from find_table_rules) to reuse them.
+    """
+    gray = gray.convert("L")
+    vertical, horizontal = rules if rules is not None else find_table_rules(gray)
+    grown = ImageChops.lighter(vertical, horizontal).filter(ImageFilter.MaxFilter(3))  # soft edges too
+    return ImageChops.lighter(gray, grown)
+
+
+def vertical_rule_xs(vertical: Image.Image, y_px: int) -> list[float]:
+    """The x (pixels) of the center of each vertical rule crossing row `y_px`."""
+    row = vertical.crop((0, y_px, vertical.width, y_px + 1)).tobytes()
+    return [(run.start() + run.end() - 1) / 2 for run in _INK_RUN.finditer(row)]
 
 
 def _straight_runs(ink: Image.Image, length: int, *, vertical: bool) -> Image.Image:
@@ -414,6 +434,18 @@ def _ink_mask(gray: Image.Image) -> tuple[bytes, int, int]:
     threshold = (low + high) / 2
     mask = gray.point(lambda value: _INK if value < threshold else 0)
     return mask.tobytes(), gray.width, gray.height
+
+
+def _with_alignment(blocks: list[TextBlock], vertical_rules: Image.Image) -> list[TextBlock]:
+    """Set each block's alignment and cell borders from the vertical rules on its row."""
+    px_per_pt = _RENDER_DPI / _PDF_POINTS_PER_INCH
+
+    def rules_at(block: TextBlock) -> list[float]:
+        row = int((block.y0 + block.y1) / 2 * px_per_pt)
+        row = min(max(row, 0), vertical_rules.height - 1)
+        return [x / px_per_pt for x in vertical_rule_xs(vertical_rules, row)]
+
+    return assign_alignment(blocks, rules_at)
 
 
 def _crop_block(block: TextBlock, gray: Image.Image) -> tuple[Image.Image, int]:

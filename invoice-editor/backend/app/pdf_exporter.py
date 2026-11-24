@@ -38,22 +38,21 @@ def apply_edits(
 
         fonts = {name: fitz.Font(name) for name in FITZ_FONTS.values()}
         for block, new_text, fontname in page_edits:
-            fontsize = block.size
+            fontsize = _fitted_size(block, new_text, fonts[fontname])
             text_width = fonts[fontname].text_length(new_text, fontsize=fontsize)
-            orig_width = block.x1 - block.x0
+            x = _anchored_x(block, text_width)
 
             # Cover original text with a white rectangle drawn in the content stream.
             # draw_rect does NOT erase PDF XObjects (images, vector graphics) — it
             # simply paints white on top of them in drawing order, so logos and other
             # graphics behind the text area are preserved in the file and render
-            # correctly when the new text does not overlap them.
-            cover_width = max(orig_width, text_width + 2)
-            cover_rect = fitz.Rect(block.x0, block.y0, block.x0 + cover_width, block.y1)
-            page.draw_rect(cover_rect, color=(1, 1, 1), fill=(1, 1, 1))
+            # correctly when the new text does not overlap them. The cover never reaches
+            # a table border, so the border lines stay intact.
+            page.draw_rect(_cover_rect(block, x, text_width), color=(1, 1, 1), fill=(1, 1, 1))
 
             baseline = block.baseline if block.baseline is not None else block.y1 - 1.0
             page.insert_text(
-                (block.x0, baseline),
+                (x, baseline),
                 new_text,
                 fontname=fontname,
                 fontsize=fontsize,
@@ -64,3 +63,46 @@ def apply_edits(
     doc.save(buf, garbage=4, deflate=True)
     doc.close()
     return buf.getvalue()
+
+
+_MIN_CELL_MARGIN_PT = 1.5   # the least gap an edit keeps to a cell border
+_BORDER_CLEARANCE_PT = 1.5  # the white cover stops this far from a border
+
+
+def _cell_margin(block: TextBlock) -> float:
+    """The gap the original text left to the border on the side it is anchored to."""
+    gap_left = block.x0 - block.limit_x0
+    gap_right = block.limit_x1 - block.x1
+    gap = {"right": gap_right, "left": gap_left}.get(block.align, min(gap_left, gap_right))
+    return max(gap, _MIN_CELL_MARGIN_PT)
+
+
+def _fitted_size(block: TextBlock, text: str, font: fitz.Font) -> float:
+    """The block's size, reduced only if the text would not fit between its cell borders."""
+    if block.limit_x0 is None or block.limit_x1 is None:
+        return block.size
+    available = block.limit_x1 - block.limit_x0 - 2 * _cell_margin(block)
+    width = font.text_length(text, fontsize=block.size)
+    if available <= 0 or width <= available:
+        return block.size
+    return block.size * available / width
+
+
+def _anchored_x(block: TextBlock, width: float) -> float:
+    """Where the text starts so it keeps the anchor of the original: left edge, right edge or center."""
+    if block.align == "right":
+        return block.x1 - width
+    if block.align == "center":
+        return (block.x0 + block.x1) / 2 - width / 2
+    return block.x0
+
+
+def _cover_rect(block: TextBlock, x: float, width: float) -> fitz.Rect:
+    """The white patch over the original text and the new one, held clear of the cell borders."""
+    left = min(block.x0, x)
+    right = max(block.x1, x + width + 2)
+    if block.limit_x0 is not None:
+        left = max(left, block.limit_x0 + _BORDER_CLEARANCE_PT)
+    if block.limit_x1 is not None:
+        right = min(right, block.limit_x1 - _BORDER_CLEARANCE_PT)
+    return fitz.Rect(left, block.y0, right, block.y1)
