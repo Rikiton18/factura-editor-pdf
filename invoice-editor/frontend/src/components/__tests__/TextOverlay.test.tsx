@@ -169,6 +169,39 @@ test('preview overlay uses the chosen font', () => {
   expect(shown.style.fontWeight).toBe('700')
 })
 
+// ── edited text keeps the anchor of the original (right-aligned numbers) ────
+
+test.each([
+  ['right', 'flex-end'],
+  ['center', 'center'],
+  ['left', 'flex-start'],
+] as const)('preview of a %s-aligned block keeps that anchor', (align, justify) => {
+  render(<PreviewOverlay block={{ ...block, align }} editedText="Listo" scale={1} />)
+  const shown = screen.getByText('Listo')
+
+  expect(shown.style.display).toBe('flex')
+  expect(shown.style.justifyContent).toBe(justify)
+})
+
+test('preview of a block without alignment info anchors at the left', () => {
+  render(<PreviewOverlay block={block} editedText="Listo" scale={1} />)
+
+  expect(screen.getByText('Listo').style.justifyContent).toBe('flex-start')
+})
+
+test('a longer preview text is not clipped by the box of the original', () => {
+  render(<PreviewOverlay block={{ ...block, align: 'right' }} editedText="B/ 1,234,567.89" scale={1} />)
+
+  expect(screen.getByText('B/ 1,234,567.89').style.overflow).toBe('visible')
+  expect(screen.getByText('B/ 1,234,567.89').style.whiteSpace).toBe('nowrap')
+})
+
+test('edited text on the page keeps the anchor of a right-aligned block', () => {
+  render(<EditableOverlay block={{ ...block, align: 'right' }} editedText="Nuevo" onEdit={vi.fn()} scale={1} />)
+
+  expect(screen.getByText('Nuevo').style.justifyContent).toBe('flex-end')
+})
+
 test('preview overlay keeps the font and weight', () => {
   render(<PreviewOverlay block={boldBlock} editedText="Listo" scale={1} />)
   const shown = screen.getByText('Listo')

@@ -11,6 +11,7 @@ export interface TextBlock {
   color: [number, number, number]
   flags: number
   editable: boolean
+  align?: 'left' | 'right' | 'center' // how the text sits in its table cell
 }
 
 export interface EditorState {

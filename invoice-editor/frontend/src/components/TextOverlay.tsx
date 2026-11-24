@@ -10,6 +10,18 @@ const EDIT_PADDING_PX = 6
 const EDIT_LINE_HEIGHT = 1.6 // field height as a multiple of the font size
 const AVG_CHAR_WIDTH_EM = 0.6 // generous average advance so typed text never clips
 
+const JUSTIFY = { left: 'flex-start', center: 'center', right: 'flex-end' } as const
+
+// Lays the text out like the exported PDF: it keeps the anchor of the original (left,
+// center or right edge) and a longer text grows from there instead of being clipped.
+const anchoredLayout = (block: TextBlock, grows: boolean): React.CSSProperties => ({
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: JUSTIFY[block.align ?? 'left'],
+  whiteSpace: 'nowrap',
+  overflow: grows ? 'visible' : 'hidden',
+})
+
 const chipStyle = (selected: boolean): React.CSSProperties => ({
   fontFamily: 'system-ui, sans-serif',
   fontSize: 11,
@@ -129,6 +141,7 @@ export function EditableOverlay({ block, editedText, font, onEdit, onFontChange,
     <div
       style={{
         ...base,
+        ...anchoredLayout(block, isEdited),
         border: isEdited
           ? '1px dashed #16a34a'
           : hovered
@@ -173,7 +186,7 @@ export function PreviewOverlay({ block, editedText, font, scale }: PreviewOverla
         ...cssFont(font ?? block.font),
         fontSize: block.size * scale,
         lineHeight: `${(block.y1 - block.y0) * scale}px`,
-        overflow: 'hidden',
+        ...anchoredLayout(block, true),
         boxSizing: 'border-box',
         padding: 0,
         pointerEvents: 'none',
